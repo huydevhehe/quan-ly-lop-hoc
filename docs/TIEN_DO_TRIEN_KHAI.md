@@ -175,19 +175,44 @@
 
 ---
 
+### Giai đoạn 3A: Mở rộng Báo cáo & Bảng điểm (Tính năng mới theo docx)
+Đã hoàn thành 4 Task nâng cấp toàn diện phân hệ Báo cáo:
+
+1. **Task 1: Thống kê scoresService**
+   - File: `src/services/scoresService.ts`
+   - `getClassStats(classId, semester)`: Thống kê số lượng theo nhóm xếp loại (T, H, C, Chưa có điểm), phổ điểm 4 mốc (9-10, 7-8, 5-6, dưới 5) và mốc vắng học sinh (>2 buổi).
+   - Unit test: `src/services/__tests__/scoresService.test.ts` (PASS 5/5).
+
+2. **Task 2: Biểu đồ, Bộ lọc và Banner cảnh báo**
+   - File: `src/components/reports/ClassificationPieChart.tsx`: Biểu đồ tròn xếp loại Recharts.
+   - File: `src/components/reports/ScoreAttendanceBarChart.tsx`: Biểu đồ cột phổ điểm & chuyên cần Recharts.
+   - File: `src/components/reports/WarningBanner.tsx`: Banner thông minh tự động cảnh báo học sinh chưa có điểm hoặc vắng nhiều (tự ẩn khi không có học sinh cảnh báo).
+
+3. **Task 3: Cột Chuyên cần & Popup hồ sơ nhanh**
+   - File: `src/components/reports/StudentQuickProfilePopup.tsx`: Popup hiển thị tóm tắt hồ sơ, xếp loại, điểm và nhận xét khi click vào học sinh.
+
+4. **Task 4: Xuất Excel chuẩn in ấn (exceljs)**
+   - File: `src/services/excelExportService.ts`:
+     - `exportFinalReportExcel`: Xuất bảng điểm chuẩn định dạng Times New Roman, border, auto-fit độ rộng cột chống cắt chữ.
+     - `exportWeeklyCommentsExcel`: Xuất bảng nhận xét chi tiết 35 tuần của cả lớp.
+   - Unit test: `src/services/__tests__/excelExportService.test.ts` (PASS 2/2).
+
+---
+
 ## 3. Kết quả kiểm thử & Chất lượng mã nguồn
 
-- **Unit Test (Vitest)**: Toàn bộ **38/38 test cases đều PASS**.
+- **Unit Test (Vitest)**: Toàn bộ **42/42 test cases đều PASS**.
   - `src/lib/__tests__/supabaseClient.test.ts`: 1 passed.
   - `src/services/__tests__/authService.test.ts`: 4 passed.
   - `src/services/__tests__/classesService.test.ts`: 4 passed.
   - `src/services/__tests__/studentsService.test.ts`: 4 passed.
   - `src/services/__tests__/attendanceService.test.ts`: 4 passed.
-  - `src/services/__tests__/scoresService.test.ts`: 3 passed.
+  - `src/services/__tests__/scoresService.test.ts`: 5 passed.
   - `src/services/__tests__/quizService.test.ts`: 5 passed.
   - `src/services/__tests__/examService.test.ts`: 4 passed.
   - `src/services/__tests__/resourcesService.test.ts`: 5 passed.
   - `src/services/__tests__/adminService.test.ts`: 4 passed.
+  - `src/services/__tests__/excelExportService.test.ts`: 2 passed.
 - **TypeScript Static Analysis (`tsc --noEmit`)**: **0 Lỗi** (Không có cảnh báo hay lỗi kiểu dữ liệu).
 
 ---
