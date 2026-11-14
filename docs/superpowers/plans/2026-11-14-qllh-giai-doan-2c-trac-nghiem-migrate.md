@@ -81,7 +81,7 @@
   - `startExamSession(studentName: string, classId: string | null, isFreeSlot: boolean, topicIds: string[]): Promise<{ sessionId: string; questions: Array<{ id: string; content: string; options: string[]; imageUrl?: string }> }>`
   - `submitExamResult(sessionId: string, correctCount: number, totalQuestions: number, durationSeconds: number): Promise<void>`
 
-- [ ] **Step 1: Viết test "nộp bài 2 lần không tạo 2 kết quả" (Review Focus #2)**
+- [x] **Step 1: Viết test "nộp bài 2 lần không tạo 2 kết quả" (Review Focus #2)**
   ```ts
   test('submitExamResult lan 2 khong tao them dong moi', async () => {
     await submitExamResult(sessionId, 8, 10, 120);
@@ -91,20 +91,20 @@
   });
   ```
 
-- [ ] **Step 2: Chạy test, xác nhận fail**
+- [x] **Step 2: Chạy test, xác nhận fail**
   Expected: FAIL vì `examService` chưa tồn tại (và bảng `quiz_results` ở Giai đoạn 1 chưa có cách chặn trùng `session_id` — cần bổ sung unique).
 
-- [ ] **Step 3: Bổ sung unique constraint còn thiếu + implement**
+- [x] **Step 3: Bổ sung unique constraint còn thiếu + implement**
   Thêm vào migration mới `supabase/migrations/0009_quiz_results_unique_session.sql`:
   ```sql
   alter table public.quiz_results add constraint quiz_results_session_unique unique (session_id);
   ```
   Chạy `npx supabase db push --remote`. `submitExamResult`: dùng `upsert(..., { onConflict: 'session_id' })` thay vì `insert` thuần, để lần nộp thứ 2 **ghi đè** lần 1 (không lỗi, không tạo dòng mới) — chọn ghi đè vì double-click là lỗi UI tạm thời, không phải học sinh cố tình nộp 2 lần khác nhau. `startExamSession`: query `quiz_questions_public` theo `topic_ids`, tạo `quiz_sessions` với `question_order` lưu đúng thứ tự trả về (chưa xáo trộn — ghi chú rõ trong code `// TODO Giai đoạn 3B: xáo trộn câu hỏi/đáp án tại đây`). Validate `durationSeconds > 0` trước khi lưu (Review Focus #5), nếu âm/bất thường thì `throw`.
 
-- [ ] **Step 4: Chạy lại test**
+- [x] **Step 4: Chạy lại test**
   Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
   ```bash
   git add supabase/migrations/0009_quiz_results_unique_session.sql src/services/examService.ts src/services/__tests__/examService.test.ts
   git commit -m "feat: add examService and prevent duplicate quiz submissions"
