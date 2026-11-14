@@ -13,13 +13,19 @@ import {
   Download,
   Upload,
   Sparkles,
-  Shuffle
+  Shuffle,
+  Link2,
+  ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Classroom, Student, UserAccount } from '../types';
 import { soundManager } from '../utils/audio';
 import { StudentCommentsManager } from './StudentCommentsManager';
 import { Award } from 'lucide-react';
+import { SaveLinkForm } from './resources/SaveLinkForm';
+import { listResources, deleteResource } from '../services/resourcesService';
+import { Resource } from '../types';
 
 interface UtilitiesSectionProps {
   classrooms: Classroom[];
@@ -38,15 +44,32 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
   isAdmin = true,
   currentUser,
 }) => {
-  const [activeTab, setActiveTab] = useState<'comments' | 'timer' | 'teams' | 'excel'>(() => {
+  const [activeTab, setActiveTab] = useState<'comments' | 'timer' | 'teams' | 'excel' | 'links'>(() => {
     try {
       const saved = localStorage.getItem('qllh_utilities_subtab');
-      if (saved === 'comments' || saved === 'timer' || saved === 'teams' || saved === 'excel') {
+      if (saved === 'comments' || saved === 'timer' || saved === 'teams' || saved === 'excel' || saved === 'links') {
         return saved;
       }
     } catch {}
     return 'comments';
   });
+
+  const [utilityLinks, setUtilityLinks] = useState<Resource[]>([]);
+
+  const fetchUtilityLinks = async () => {
+    try {
+      const data = await listResources('link');
+      setUtilityLinks(data);
+    } catch (e) {
+      console.warn('Lỗi tải liên kết tiện ích:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'links') {
+      fetchUtilityLinks();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     try {
@@ -269,6 +292,17 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
               <span>Nhập danh sách Excel</span>
             </button>
           )}
+          <button
+            onClick={() => setActiveTab('links')}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'links'
+                ? 'bg-white text-indigo-600 shadow-sm ring-2 ring-indigo-100'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+          >
+            <Link2 className="w-3.5 h-3.5" />
+            <span>Liên kết tiện ích</span>
+          </button>
         </div>
       </div>
 
@@ -539,6 +573,79 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
       {/* TAB 4: STUDENT COMMENTS EXCEL MANAGER */}
       {activeTab === 'comments' && (
         <StudentCommentsManager currentUser={currentUser} />
+      )}
+
+      {/* TAB 5: UTILITY LINKS */}
+      {activeTab === 'links' && (
+        <div className="space-y-5 animate-in fade-in duration-150">
+          <SaveLinkForm
+            type="link"
+            grade={currentClass?.grade || 1}
+            onSaved={fetchUtilityLinks}
+          />
+
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-4">
+            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+              <Link2 className="w-4 h-4 text-indigo-600" />
+              <span>Danh sách liên kết web tiện ích đã lưu</span>
+            </h3>
+
+            {utilityLinks.length === 0 ? (
+              <p className="text-center py-8 text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+                Chưa có liên kết tiện ích nào được lưu. Hãy nhập liên kết ở biểu mẫu phía trên.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {utilityLinks.map((link) => (
+                  <div
+                    key={link.id}
+                    className="p-4 rounded-2xl border border-slate-200 hover:border-indigo-300 bg-white hover:shadow-xs transition-all flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                        <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                          Khối {link.grade}
+                        </span>
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-slate-400 hover:text-indigo-600 p-1"
+                          title="Mở liên kết"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                      <h4 className="font-bold text-slate-800 text-xs mt-1 leading-snug line-clamp-2">
+                        {link.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-400 mt-1 truncate font-mono">
+                        {link.url}
+                      </p>
+                    </div>
+
+                    {isAdmin && (
+                      <div className="flex items-center justify-end pt-3 mt-2 border-t border-slate-100">
+                        <button
+                          onClick={async () => {
+                            if (confirm('Bạn chắc chắn muốn xóa liên kết này?')) {
+                              await deleteResource(link.id);
+                              fetchUtilityLinks();
+                            }
+                          }}
+                          className="text-[11px] font-bold text-rose-500 hover:text-rose-700 flex items-center gap-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Xóa</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

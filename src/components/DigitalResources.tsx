@@ -14,6 +14,7 @@ import {
 import { DigitalResource } from '../types';
 import { pushAllDataToFirestore } from '../firebase';
 import { createResource } from '../services/resourcesService';
+import { SaveLinkForm } from './resources/SaveLinkForm';
 
 interface DigitalResourcesProps {
   resources: DigitalResource[];
@@ -29,6 +30,7 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({
   const [selectedGrade, setSelectedGrade] = useState<number | 'all'>('all');
   const [activeVideo, setActiveVideo] = useState<DigitalResource | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showSaveLinkForm, setShowSaveLinkForm] = useState(false);
 
   // New resource form state
   const [newTitle, setNewTitle] = useState('');
@@ -101,15 +103,35 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({
         </div>
 
         {isAdmin && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Thêm liên kết video mới</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowSaveLinkForm((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold shadow-xs transition-colors shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Lưu link website</span>
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Thêm liên kết video mới</span>
+            </button>
+          </div>
         )}
       </div>
+
+      {showSaveLinkForm && (
+        <SaveLinkForm
+          type="link"
+          grade={selectedGrade === 'all' ? 1 : selectedGrade}
+          onSaved={() => {
+            setShowSaveLinkForm(false);
+          }}
+          onCancel={() => setShowSaveLinkForm(false)}
+        />
+      )}
 
       {/* Grade Selector Tabs */}
       <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-2xs overflow-x-auto">
