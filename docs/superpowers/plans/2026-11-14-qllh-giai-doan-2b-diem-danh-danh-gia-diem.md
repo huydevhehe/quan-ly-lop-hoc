@@ -80,17 +80,17 @@
   - `getClassScores(classId: string, semester: 'hk1'|'ca_nam'): Promise<Array<{ studentId: string; theoryScore: number|null; practiceScore: number|null; totalScore: number|null; classification: 'T'|'H'|'C'|null }>>`
   - `saveScore(studentId: string, semester: 'hk1'|'ca_nam', theoryScore: number, practiceScore: number): Promise<void>`
 
-- [ ] **Step 1: Viết test "điểm ngoài khoảng 0-10 bị chặn" (Review Focus #1)**
+- [x] **Step 1: Viết test "điểm ngoài khoảng 0-10 bị chặn" (Review Focus #1)**
   ```ts
   test('saveScore bao loi khi diem ngoai khoang 0-10', async () => {
     await expect(saveScore(sId, 'hk1', 15, 5)).rejects.toThrow();
   });
   ```
 
-- [ ] **Step 2: Chạy test, xác nhận fail**
+- [x] **Step 2: Chạy test, xác nhận fail**
   Expected: FAIL vì `scoresService` chưa tồn tại (và vì schema `scores` ở Giai đoạn 1 chưa có CHECK constraint giới hạn 0-10 cho `theory_score`/`practice_score` — chỉ giới hạn `numeric(4,1)` về kiểu dữ liệu, không giới hạn khoảng giá trị).
 
-- [ ] **Step 3: Bổ sung constraint còn thiếu + implement**
+- [x] **Step 3: Bổ sung constraint còn thiếu + implement**
   Tạo thêm migration mới `supabase/migrations/0008_scores_range_check.sql`:
   ```sql
   alter table public.scores
@@ -99,10 +99,10 @@
   ```
   Chạy `npx supabase db push --remote` để áp lên project thật. `saveScore`: `supabase.from('scores').upsert({ student_id: studentId, semester, theory_score: theoryScore, practice_score: practiceScore }, { onConflict: 'student_id,semester' })` — để lỗi constraint nổi nguyên văn lên, không nuốt lỗi. `getClassScores`: join `students` lọc theo `class_id`, map `classification` thẳng từ cột generated, không tính lại ở FE.
 
-- [ ] **Step 4: Chạy lại test**
+- [x] **Step 4: Chạy lại test**
   Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
   ```bash
   git add supabase/migrations/0008_scores_range_check.sql src/services/scoresService.ts src/services/__tests__/scoresService.test.ts
   git commit -m "feat: add scoresService and score range constraint"
