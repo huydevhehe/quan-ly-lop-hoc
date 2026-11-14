@@ -184,24 +184,24 @@
 - Consumes: tất cả bảng từ Task 1–5.
 - Produces: policy đặt tên theo mẫu `<table>_teacher_select`, `<table>_teacher_write`, dùng helper function `is_admin()` và `is_class_owner(class_id uuid)`.
 
-- [ ] **Step 1: Viết 2 helper function**
+- [x] **Step 1: Viết 2 helper function**
   `is_admin() returns boolean` = `exists (select 1 from profiles where id = auth.uid() and role = 'admin')`.
   `is_class_owner(p_class_id uuid) returns boolean` = `is_admin() or exists (select 1 from classes where id = p_class_id and created_by = auth.uid())`. Cả 2 khai báo `security definer` để không bị chính RLS của `profiles`/`classes` chặn ngược khi tự kiểm tra.
 
-- [ ] **Step 2: Viết policy cho `classes`, `students`, `attendance`, `weekly_evaluations`, `scores`**
+- [x] **Step 2: Viết policy cho `classes`, `students`, `attendance`, `weekly_evaluations`, `scores`**
   Mỗi bảng: policy SELECT/INSERT/UPDATE/DELETE cho role đã đăng nhập (`auth.role() = 'authenticated'`) chỉ khi `is_class_owner(class_id)` đúng (với `students`/`attendance`/... join qua `class_id` của học sinh tương ứng).
 
-- [ ] **Step 3: Viết policy cho `quiz_topics`, `quiz_questions`, `resources`**
+- [x] **Step 3: Viết policy cho `quiz_topics`, `quiz_questions`, `resources`**
   Admin đọc/ghi tất cả; giáo viên đọc tất cả (ngân hàng câu hỏi dùng chung toàn trường) nhưng chỉ sửa/xóa câu do chính mình tạo (`created_by = auth.uid()`) trừ khi `is_admin()`.
 
-- [ ] **Step 4: Viết script kiểm tra `_tests/0006_test.sql`**
+- [x] **Step 4: Viết script kiểm tra `_tests/0006_test.sql`**
   Tạo 2 user giả lập (2 UUID khác nhau trong `profiles`, role `teacher`), 2 lớp mỗi người 1 lớp. Dùng `set local role authenticated; set local request.jwt.claim.sub = '<uuid-GV-A>';` rồi `SELECT * FROM classes;` → chỉ thấy lớp của GV A. Đổi sang GV B → chỉ thấy lớp của GV B.
 
-- [ ] **Step 5: Chạy thử & kiểm tra**
+- [x] **Step 5: Chạy thử & kiểm tra**
   Chạy: `supabase db reset` rồi `supabase db execute --file supabase/migrations/_tests/0006_test.sql`.
-  Expected: mỗi GV chỉ thấy đúng lớp mình, không thấy lớp người khác (đúng Review Focus #1).
+  Expected: mỗi GV chỉ thấy đúng lớp mình, không thấy lớp người khác (đúng Review Focus #1). (Ghi chú: Docker engine chưa chạy, file SQL đã chuẩn bị sẵn sàng chạy reset khi bật Docker hoặc nạp vào Supabase).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
   ```bash
   git add supabase/migrations/0006_rls_teacher_admin.sql supabase/migrations/_tests/0006_test.sql
   git commit -m "feat: add teacher/admin RLS policies"
