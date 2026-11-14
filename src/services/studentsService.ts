@@ -28,7 +28,12 @@ export async function listStudentsByClass(classId: string): Promise<Student[]> {
     classId: s.class_id,
     code: s.student_code,
     name: s.full_name,
-    avatar: s.avatar || undefined,
+    gender: (s.gender as 'Nam' | 'Nữ') || 'Nam',
+    dob: s.dob || '2018-01-01',
+    avatar: s.avatar || '',
+    attendance: 'present',
+    stars: 0,
+    speeches: 0,
   }));
 }
 
@@ -60,7 +65,12 @@ export async function upsertStudents(classId: string, students: StudentInput[]):
     classId: s.class_id,
     code: s.student_code,
     name: s.full_name,
-    avatar: s.avatar || undefined,
+    gender: (s.gender as 'Nam' | 'Nữ') || 'Nam',
+    dob: s.dob || '2018-01-01',
+    avatar: s.avatar || '',
+    attendance: 'present',
+    stars: 0,
+    speeches: 0,
   }));
 }
 

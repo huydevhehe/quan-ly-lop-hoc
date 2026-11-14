@@ -31,10 +31,11 @@ export async function signInStaff(email: string, password: string): Promise<Auth
   const mappedUser: UserAccount = {
     id: profile.id,
     username: profile.email || email,
-    displayName: profile.full_name || 'Người dùng',
+    fullName: profile.full_name || 'Người dùng',
     role: profile.role as 'admin' | 'teacher',
     status: 'active',
     avatar: profile.avatar || undefined,
+    createdAt: new Date().toISOString(),
   };
 
   return { profile: mappedUser };

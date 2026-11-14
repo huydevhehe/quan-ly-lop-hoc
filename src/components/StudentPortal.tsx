@@ -26,6 +26,7 @@ import confetti from 'canvas-confetti';
 import { QuizQuestion, QuizSubmission, Classroom, DigitalResource } from '../types';
 import { soundManager } from '../utils/audio';
 import { syncQuizSubmissionToFirestore } from '../firebase';
+import { signInStudentWithRoomCode } from '../services/authService';
 
 interface StudentPortalProps {
   roomCode: string;
@@ -79,7 +80,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
   const [isResourcesListOpen, setIsResourcesListOpen] = useState(false);
 
   // Validate room code
-  const handleVerifyCode = (e: React.FormEvent) => {
+  const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setCodeError('');
 
@@ -89,8 +90,15 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
       return;
     }
 
-    // Accept teacher's current roomCode or standard default F08AF1
-    if (trimmed === roomCode.toUpperCase() || trimmed === 'F08AF1' || trimmed === 'DEMO') {
+    // Xác thực qua Supabase Anonymous Auth và kiểm tra room_code thật
+    try {
+      const result = await signInStudentWithRoomCode(trimmed);
+      if ('error' in result) {
+        soundManager.playTick();
+        setCodeError(result.error || `Mã lớp "${trimmed}" chưa chính xác.`);
+        return;
+      }
+
       soundManager.playFanfare();
       confetti({
         particleCount: 40,
@@ -98,9 +106,9 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
         origin: { y: 0.6 }
       });
       setCurrentView('hub');
-    } else {
+    } catch (err: any) {
       soundManager.playTick();
-      setCodeError(`Mã lớp "${trimmed}" chưa chính xác. Thử nhập mã: ${roomCode}`);
+      setCodeError(err.message || 'Lỗi khi tham gia phòng học');
     }
   };
 

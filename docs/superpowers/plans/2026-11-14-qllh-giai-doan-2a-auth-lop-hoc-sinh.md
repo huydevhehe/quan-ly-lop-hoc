@@ -211,19 +211,19 @@
 **Interfaces:**
 - Consumes: `authService.signInStaff`, `authService.signInStudentWithRoomCode`, `authService.getCurrentSession` từ Task 2.
 
-- [ ] **Step 1: Đọc `LoginModal.tsx` hiện tại**
+- [x] **Step 1: Đọc `LoginModal.tsx` hiện tại**
   Tìm đoạn code đang so khớp `username`/`password` với mảng `accounts` (đọc từ `localStorage.getItem('qllh_user_accounts')` hoặc tương đương) — đây là đoạn cần thay.
 
-- [ ] **Step 2: Thay logic đăng nhập GV/Admin**
+- [x] **Step 2: Thay logic đăng nhập GV/Admin**
   Thay đoạn so khớp thủ công bằng gọi `authService.signInStaff(email, password)`; nếu trả `error`, hiện đúng thông báo đó lên form (không còn thông báo "sai tài khoản" tự chế cũ).
 
-- [ ] **Step 3: Thay logic trong `RoomCodeModal.tsx`**
+- [x] **Step 3: Thay logic trong `RoomCodeModal.tsx`**
   Tìm đoạn đang so khớp `roomCode` với danh sách `classes` lấy từ `dbStorage`/`firebase` cũ, thay bằng gọi `authService.signInStudentWithRoomCode(roomCode, displayName)`.
 
-- [ ] **Step 4: Kiểm tra thủ công**
+- [x] **Step 4: Kiểm tra thủ công**
   Chạy: `npm run dev`, mở trình duyệt, thử đăng nhập GV đúng/sai mật khẩu, thử nhập mã phòng đúng/sai. Ghi lại kết quả quan sát được (vì đây là UI, không có test tự động ở bước này).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
   ```bash
   git add src/components/LoginModal.tsx src/components/RoomCodeModal.tsx src/App.tsx
   git commit -m "feat: wire login and room-code UI to new authService"

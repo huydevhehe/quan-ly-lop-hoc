@@ -58,12 +58,9 @@ export async function listMyClasses(): Promise<Classroom[]> {
       id: c.id,
       name: c.name,
       grade: c.grade || 1,
+      academicYear: '2026-2027',
       totalStudents: studentCount,
       roomCode: c.room_code,
-      isOpen: c.is_open ?? true,
-      createdAt: c.created_at,
-      schoolYearId: c.school_year_id,
-      createdBy: c.created_by,
     };
   });
 }
@@ -94,12 +91,9 @@ export async function createClass(input: CreateClassInput): Promise<Classroom> {
     id: data.id,
     name: data.name,
     grade: data.grade || 1,
+    academicYear: '2026-2027',
     totalStudents: 0,
     roomCode: data.room_code,
-    isOpen: data.is_open ?? true,
-    createdAt: data.created_at,
-    schoolYearId: data.school_year_id,
-    createdBy: data.created_by,
   };
 }
 

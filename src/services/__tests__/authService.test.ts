@@ -80,7 +80,7 @@ describe('authService', () => {
     expect('profile' in result).toBe(true);
     if ('profile' in result) {
       expect(result.profile.role).toBe('teacher');
-      expect(result.profile.displayName).toBe('Thầy Giáo A');
+      expect(result.profile.fullName).toBe('Thầy Giáo A');
     }
   });
 

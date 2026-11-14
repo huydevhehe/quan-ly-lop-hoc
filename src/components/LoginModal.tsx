@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, ShieldCheck, User, Key, LogIn, Sparkles, CheckCircle2 } from 'lucide-react';
 import { UserAccount } from '../types';
 import { soundManager } from '../utils/audio';
+import { signInStaff } from '../services/authService';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -23,36 +24,33 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+    setIsSubmitting(true);
 
-    const targetAccount = accounts.find(
-      (a) => a.username.toLowerCase() === username.trim().toLowerCase()
-    );
+    try {
+      const emailToUse = username.includes('@') ? username.trim() : `${username.trim()}@qllh.pro`;
+      const result = await signInStaff(emailToUse, password);
 
-    if (!targetAccount) {
-      setErrorMessage('Tên đăng nhập không tồn tại trong hệ thống!');
-      return;
+      if ('error' in result) {
+        setErrorMessage(result.error);
+        return;
+      }
+
+      soundManager.playFanfare();
+      onLoginSuccess(result.profile);
+      onClose();
+      setPassword('');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Lỗi đăng nhập hệ thống');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    if (targetAccount.status === 'locked') {
-      setErrorMessage('Tài khoản này đang bị tạm khóa bởi Quản trị viên!');
-      return;
-    }
-
-    // Verify password
-    if (targetAccount.password && targetAccount.password !== password) {
-      setErrorMessage('Mật khẩu không chính xác! (Mặc định: 123)');
-      return;
-    }
-
-    soundManager.playFanfare();
-    onLoginSuccess(targetAccount);
-    onClose();
-    setPassword('');
   };
 
   const handleQuickSwitchTo = (account: UserAccount) => {
