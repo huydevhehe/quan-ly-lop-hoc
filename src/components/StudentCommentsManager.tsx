@@ -14,19 +14,27 @@ import {
 } from 'lucide-react';
 
 import { UserAccount } from '../types';
-import { isClassVisibleForUser } from '../utils/userScope';
-import {
-  getSavedClasses,
-  getSavedStudents,
-  getSavedGrades,
-  getSavedCurrentYear,
-  getSavedCustomComments,
-  saveCustomCommentsPermanently,
-  getSavedGradeComments,
-  saveGradeCommentsPermanently,
-  getSavedGradeSortType,
-  saveGradeSortTypePermanently,
-} from '../utils/dbStorage';
+import { listMyClasses } from '../services/classesService';
+import { listStudentsByClass } from '../services/studentsService';
+import { getClassScores } from '../services/scoresService';
+import { getAllCommentBanks, setCommentBank, CommentBankEntry } from '../services/commentBankService';
+
+// Thứ tự sắp xếp hiển thị là tùy chọn riêng của từng thiết bị/trình duyệt (không phải dữ liệu
+// của trường), nên vẫn giữ ở localStorage — không mất dữ liệu quan trọng nếu đổi máy.
+function getSavedGradeSortTypeLocal(): 'default' | 'alphabet' | 'code' {
+  try {
+    const s = localStorage.getItem('qllh_grade_sort_type');
+    if (s === 'default' || s === 'alphabet' || s === 'code') return s;
+  } catch {}
+  return 'default';
+}
+
+function saveGradeSortTypePermanentlyLocal(type: 'default' | 'alphabet' | 'code') {
+  try {
+    localStorage.setItem('qllh_grade_sort_type', type);
+    window.dispatchEvent(new CustomEvent('qllh_grade_sort_changed', { detail: type }));
+  } catch {}
+}
 
 interface ClassItem {
   id: string;
@@ -209,16 +217,44 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
   });
 
   // Sort order synced with Thẻ Điểm ('default' = Chuẩn, 'alphabet', 'code')
-  const [sortOrder, setSortOrder] = useState<'default' | 'alphabet' | 'code'>(() => getSavedGradeSortType(currentUser));
+  const [sortOrder, setSortOrder] = useState<'default' | 'alphabet' | 'code'>(() => getSavedGradeSortTypeLocal());
 
   // Classes list
-  const [classesList, setClassesList] = useState<ClassItem[]>(() => getSavedClasses(currentUser));
+  const [classesList, setClassesList] = useState<ClassItem[]>([]);
 
   // Students list
-  const [studentsList, setStudentsList] = useState<StudentRecord[]>(() => getSavedStudents(currentUser));
+  const [studentsList, setStudentsList] = useState<StudentRecord[]>([]);
 
   // Grades data: { [studentId_term]: { lt, th, total, rank } }
-  const [gradeData, setGradeData] = useState<Record<string, GradeRecord>>(() => getSavedGrades(currentUser));
+  const [gradeData, setGradeData] = useState<Record<string, GradeRecord>>({});
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const cls = await listMyClasses();
+        setClassesList(
+          cls.map((c) => ({
+            id: c.id,
+            year: c.academicYear || '2026-2027',
+            name: c.name,
+            grade: String(c.grade),
+          }))
+        );
+        const studentsArrays = await Promise.all(cls.map((c) => listStudentsByClass(c.id)));
+        setStudentsList(
+          studentsArrays.flat().map((s) => ({
+            id: s.id,
+            classId: s.classId,
+            code: s.code,
+            name: s.name,
+            dob: s.dob,
+            gender: s.gender,
+          }))
+        );
+      } catch {}
+    };
+    loadData();
+  }, [currentUser?.id]);
 
   // Selection states
   const [selectedGrade, setSelectedGrade] = useState<string>('1'); // '1' | '2' | '3' | '4' | '5' | 'all'
@@ -228,42 +264,93 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
   const [uploadGrade, setUploadGrade] = useState<'1' | '2' | '3' | '4' | '5'>('1');
 
   // Ngân hàng nhận xét phân bổ độc lập theo từng Khối (Khối 1 -> Khối 5)
+  // Lưu thật trên Supabase (bảng comment_bank) để đồng bộ giữa các máy — xem effect tải bên dưới.
   const [gradeCommentsT, setGradeCommentsT] = useState<Record<string, string[]>>(() => {
-    const saved = getSavedGradeComments(currentUser, 'T');
     const result: Record<string, string[]> = {};
     for (const g of ['1', '2', '3', '4', '5']) {
-      result[g] = saved[g] && saved[g].length > 0 ? saved[g] : [...DEFAULT_GRADE_COMMENTS_T[g]];
+      result[g] = [...DEFAULT_GRADE_COMMENTS_T[g]];
     }
     return result;
   });
 
   const [gradeCommentsH, setGradeCommentsH] = useState<Record<string, string[]>>(() => {
-    const saved = getSavedGradeComments(currentUser, 'H');
     const result: Record<string, string[]> = {};
     for (const g of ['1', '2', '3', '4', '5']) {
-      result[g] = saved[g] && saved[g].length > 0 ? saved[g] : [...DEFAULT_GRADE_COMMENTS_H[g]];
+      result[g] = [...DEFAULT_GRADE_COMMENTS_H[g]];
     }
     return result;
   });
 
-  // Tên file đã nạp theo từng khối
-  const [fileGradeTNames, setFileGradeTNames] = useState<Record<string, string>>(() => {
-    try {
-      const raw = localStorage.getItem('qllh_file_grade_t_names');
-      return raw ? JSON.parse(raw) : {};
-    } catch {
-      return {};
-    }
-  });
+  // Tên file đã nạp theo từng khối — lưu kèm theo mỗi dòng comment_bank trên Supabase.
+  const [fileGradeTNames, setFileGradeTNames] = useState<Record<string, string>>({});
+  const [fileGradeHNames, setFileGradeHNames] = useState<Record<string, string>>({});
 
-  const [fileGradeHNames, setFileGradeHNames] = useState<Record<string, string>>(() => {
+  // Tải ngân hàng nhận xét thật từ Supabase (thay cho localStorage cũ)
+  const loadCommentBanks = async () => {
     try {
-      const raw = localStorage.getItem('qllh_file_grade_h_names');
-      return raw ? JSON.parse(raw) : {};
-    } catch {
-      return {};
+      const [banksT, banksH] = await Promise.all([getAllCommentBanks('T'), getAllCommentBanks('H')]);
+      applyLoadedBanks(banksT, 'T');
+      applyLoadedBanks(banksH, 'H');
+    } catch (e) {
+      console.error('Lỗi tải ngân hàng nhận xét:', e);
     }
-  });
+  };
+
+  const applyLoadedBanks = (banks: Record<string, CommentBankEntry>, type: 'T' | 'H') => {
+    const setComments = type === 'T' ? setGradeCommentsT : setGradeCommentsH;
+    const setFileNames = type === 'T' ? setFileGradeTNames : setFileGradeHNames;
+
+    setComments((prev) => {
+      const next = { ...prev };
+      for (const g of ['1', '2', '3', '4', '5']) {
+        if (banks[g] && banks[g].comments.length > 0) {
+          next[g] = banks[g].comments;
+        }
+      }
+      return next;
+    });
+
+    setFileNames((prev) => {
+      const next = { ...prev };
+      for (const g of ['1', '2', '3', '4', '5']) {
+        if (banks[g]?.fileName) {
+          next[g] = banks[g].fileName as string;
+        }
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    loadCommentBanks();
+  }, []);
+
+  // Điểm/xếp loại thật của học sinh theo học kỳ đang chọn, lấy từ Supabase cho mọi lớp đã tải
+  useEffect(() => {
+    const loadScores = async () => {
+      if (classesList.length === 0) return;
+      try {
+        const scoreTerm = selectedTerm === 'hk2' ? 'ca_nam' : 'hk1';
+        const scoresByClass = await Promise.all(
+          classesList.map((c) => getClassScores(c.id, scoreTerm))
+        );
+        const next: Record<string, GradeRecord> = {};
+        scoresByClass.flat().forEach((item) => {
+          const key = `${item.studentId}_${selectedTerm}`;
+          next[key] = {
+            lt: item.theoryScore !== null ? String(item.theoryScore) : '',
+            th: item.practiceScore !== null ? String(item.practiceScore) : '',
+            total: item.totalScore !== null ? String(item.totalScore) : '',
+            rank: item.classification || '',
+          };
+        });
+        setGradeData(next);
+      } catch (e) {
+        console.error('Lỗi tải điểm cho ngân hàng nhận xét:', e);
+      }
+    };
+    loadScores();
+  }, [classesList, selectedTerm]);
 
   const fileTInputRef = useRef<HTMLInputElement>(null);
   const fileHInputRef = useRef<HTMLInputElement>(null);
@@ -275,50 +362,34 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
     }
   }, [selectedGrade]);
 
-  // Lưu tên file theo khối
-  useEffect(() => {
-    localStorage.setItem('qllh_file_grade_t_names', JSON.stringify(fileGradeTNames));
-  }, [fileGradeTNames]);
-
-  useEffect(() => {
-    localStorage.setItem('qllh_file_grade_h_names', JSON.stringify(fileGradeHNames));
-  }, [fileGradeHNames]);
-
   // Sync background data & sort order from Thẻ Điểm
   useEffect(() => {
-    const handleSync = () => {
+    const handleSync = async () => {
       try {
-        setClassesList(getSavedClasses(currentUser));
-        setStudentsList(getSavedStudents(currentUser));
-        setGradeData(getSavedGrades(currentUser));
-        const savedSort = getSavedGradeSortType(currentUser);
+        const cls = await listMyClasses();
+        setClassesList(
+          cls.map((c) => ({
+            id: c.id,
+            year: c.academicYear || '2026-2027',
+            name: c.name,
+            grade: String(c.grade),
+          }))
+        );
+        const studentsArrays = await Promise.all(cls.map((c) => listStudentsByClass(c.id)));
+        setStudentsList(
+          studentsArrays.flat().map((s) => ({
+            id: s.id,
+            classId: s.classId,
+            code: s.code,
+            name: s.name,
+            dob: s.dob,
+            gender: s.gender,
+          }))
+        );
+        const savedSort = getSavedGradeSortTypeLocal();
         setSortOrder(savedSort);
 
-        const commTByGrade = getSavedGradeComments(currentUser, 'T');
-        if (commTByGrade && Object.keys(commTByGrade).length > 0) {
-          setGradeCommentsT((prev) => {
-            const next = { ...prev };
-            for (const g of ['1', '2', '3', '4', '5']) {
-              if (commTByGrade[g] && commTByGrade[g].length > 0) {
-                next[g] = commTByGrade[g];
-              }
-            }
-            return next;
-          });
-        }
-
-        const commHByGrade = getSavedGradeComments(currentUser, 'H');
-        if (commHByGrade && Object.keys(commHByGrade).length > 0) {
-          setGradeCommentsH((prev) => {
-            const next = { ...prev };
-            for (const g of ['1', '2', '3', '4', '5']) {
-              if (commHByGrade[g] && commHByGrade[g].length > 0) {
-                next[g] = commHByGrade[g];
-              }
-            }
-            return next;
-          });
-        }
+        await loadCommentBanks();
       } catch {}
     };
 
@@ -326,7 +397,7 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
       if (e?.detail) {
         setSortOrder(e.detail);
       } else {
-        const savedSort = getSavedGradeSortType(currentUser);
+        const savedSort = getSavedGradeSortTypeLocal();
         setSortOrder(savedSort);
       }
     };
@@ -355,7 +426,7 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
   const currentFileHName = fileGradeHNames[uploadGrade] || '';
 
   // Sao chép nhanh nhận xét của khối đang chọn sang toàn bộ các khối khác
-  const handleApplyToAllGrades = () => {
+  const handleApplyToAllGrades = async () => {
     if (confirm(`Bạn có chắc chắn muốn sao chép bộ nhận xét của Khối ${uploadGrade} sang tất cả các khối (Khối 1, 2, 3, 4, 5)?`)) {
       const newGradeT: Record<string, string[]> = {};
       const newGradeH: Record<string, string[]> = {};
@@ -374,23 +445,28 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
       setFileGradeTNames(newFileT);
       setFileGradeHNames(newFileH);
 
-      saveGradeCommentsPermanently(newGradeT, currentUser, 'T');
-      saveGradeCommentsPermanently(newGradeH, currentUser, 'H');
-
-      alert(`✅ Đã áp dụng bộ nhận xét của Khối ${uploadGrade} cho toàn bộ Khối 1 đến 5!`);
+      try {
+        await Promise.all([
+          ...['1', '2', '3', '4', '5'].map((g) => setCommentBank('T', Number(g), newGradeT[g], newFileT[g])),
+          ...['1', '2', '3', '4', '5'].map((g) => setCommentBank('H', Number(g), newGradeH[g], newFileH[g])),
+        ]);
+        alert(`✅ Đã áp dụng bộ nhận xét của Khối ${uploadGrade} cho toàn bộ Khối 1 đến 5!`);
+      } catch (e: any) {
+        alert(`Lỗi khi lưu lên máy chủ: ${e?.message || e}`);
+      }
     }
   };
 
   const handleSortOrderChange = (newOrder: 'default' | 'alphabet' | 'code') => {
     setSortOrder(newOrder);
-    saveGradeSortTypePermanently(newOrder, currentUser);
+    saveGradeSortTypePermanentlyLocal(newOrder);
     window.dispatchEvent(new CustomEvent('qllh_grade_sort_changed', { detail: newOrder }));
   };
 
-  // Filter classes belonging to selected grade and current year AND current user
+  // Filter classes belonging to selected grade and current year
   const matchingClasses = useMemo(() => {
     const yearFiltered = classesList.filter(
-      (c) => c.year === currentYear && isClassVisibleForUser(c, currentUser)
+      (c) => c.year === currentYear
     );
     if (selectedGrade === 'all') {
       return yearFiltered.sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true }));
@@ -471,7 +547,9 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
             };
             setGradeCommentsT(updated);
             setFileGradeTNames((prev) => ({ ...prev, [uploadGrade]: file.name }));
-            saveGradeCommentsPermanently(updated, currentUser, 'T');
+            setCommentBank('T', Number(uploadGrade), parsedComments, file.name).catch((err) =>
+              alert(`Lỗi khi lưu lên máy chủ: ${err?.message || err}`)
+            );
           } else {
             const updated = {
               ...gradeCommentsH,
@@ -479,7 +557,9 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
             };
             setGradeCommentsH(updated);
             setFileGradeHNames((prev) => ({ ...prev, [uploadGrade]: file.name }));
-            saveGradeCommentsPermanently(updated, currentUser, 'H');
+            setCommentBank('H', Number(uploadGrade), parsedComments, file.name).catch((err) =>
+              alert(`Lỗi khi lưu lên máy chủ: ${err?.message || err}`)
+            );
           }
           alert(`✅ Đã nạp thành công ${parsedComments.length} nhận xét loại ${type} cho Khối ${uploadGrade} từ file "${file.name}"!`);
         } else {
@@ -523,7 +603,9 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
           delete next[uploadGrade];
           return next;
         });
-        saveGradeCommentsPermanently(updated, currentUser, 'T');
+        setCommentBank('T', Number(uploadGrade), defaultList, undefined).catch((err) =>
+          alert(`Lỗi khi lưu lên máy chủ: ${err?.message || err}`)
+        );
       } else {
         const defaultList = DEFAULT_GRADE_COMMENTS_H[uploadGrade] || DEFAULT_COMMENTS_H;
         const updated = { ...gradeCommentsH, [uploadGrade]: defaultList };
@@ -533,7 +615,9 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
           delete next[uploadGrade];
           return next;
         });
-        saveGradeCommentsPermanently(updated, currentUser, 'H');
+        setCommentBank('H', Number(uploadGrade), defaultList, undefined).catch((err) =>
+          alert(`Lỗi khi lưu lên máy chủ: ${err?.message || err}`)
+        );
       }
     }
   };
