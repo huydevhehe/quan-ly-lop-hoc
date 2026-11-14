@@ -239,16 +239,16 @@
 **Interfaces:**
 - Consumes: `classesService`, `studentsService` từ Task 3/4.
 
-- [ ] **Step 1: Tìm mọi chỗ gọi hàm cũ**
+- [x] **Step 1: Tìm mọi chỗ gọi hàm cũ**
   Tìm trong `ClassroomManager.tsx` (và component con nếu có) mọi lời gọi tới `getSavedClasses`, `saveClassesPermanently`, `getSavedStudents`, `saveStudentsPermanently`, `deleteClassFromFirestore`, `deleteStudentFromFirestore` (từ `dbStorage.ts`/`firebase.ts`).
 
-- [ ] **Step 2: Thay từng lời gọi**
+- [x] **Step 2: Thay từng lời gọi**
   `getSavedClasses` → `classesService.listMyClasses()`; `saveClassesPermanently` (tạo mới) → `classesService.createClass()`; `saveClassesPermanently` (sửa) → `classesService.updateClass()`; `deleteClassFromFirestore` → `classesService.deleteClass()`; tương tự với học sinh qua `studentsService`.
 
-- [ ] **Step 3: Kiểm tra thủ công**
+- [x] **Step 3: Kiểm tra thủ công**
   Chạy: `npm run dev`, thử tạo lớp mới, thêm học sinh, xóa lớp, xóa học sinh trên giao diện thật. Xác nhận dữ liệu lên đúng Supabase (xem qua Supabase Studio hoặc `supabase db execute` một câu `select`).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
   ```bash
   git add src/components/ClassroomManager.tsx
   git commit -m "feat: wire ClassroomManager to Supabase-backed services"

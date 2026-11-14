@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Student, UserAccount } from '../types';
+import { listMyClasses, createClass, updateClass, deleteClass } from '../services/classesService';
+import { listStudentsByClass, upsertStudents, deleteStudent } from '../services/studentsService';
 import {
   pushAllDataToFirestore,
   deleteClassFromFirestore,
