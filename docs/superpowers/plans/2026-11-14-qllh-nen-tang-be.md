@@ -100,17 +100,17 @@
 - Consumes: `students(id)` từ Task 2.
 - Produces: `attendance(id uuid pk default gen_random_uuid(), student_id uuid references students(id) on delete cascade, week_number smallint check (week_number between 1 and 35), status text check (status in ('present','excused','unexcused')), note text, unique(student_id, week_number))`; `weekly_evaluations(id uuid pk default gen_random_uuid(), student_id uuid references students(id) on delete cascade, week_number smallint check (week_number between 1 and 35), comment text, unique(student_id, week_number))`; `scores(id uuid pk default gen_random_uuid(), student_id uuid references students(id) on delete cascade, semester text check (semester in ('hk1','ca_nam')), theory_score numeric(4,1), practice_score numeric(4,1), total_score numeric(4,1) generated always as (round((coalesce(theory_score,0)+coalesce(practice_score,0))/2, 1)) stored, classification text generated always as (case when coalesce((theory_score+practice_score)/2,0) >= 9 then 'T' when coalesce((theory_score+practice_score)/2,0) >= 5 then 'H' else 'C' end) stored, unique(student_id, semester))`.
 
-- [ ] **Step 1: Viết migration `0003_attendance_scores.sql`**
+- [x] **Step 1: Viết migration `0003_attendance_scores.sql`**
   Tạo 3 bảng, bật RLS. Chú ý cú pháp generated column của Postgres không cho gọi hàm `round()` trực tiếp trên biểu thức có `coalesce` lồng nhau nếu kiểu không khớp — ép kiểu `numeric` rõ ràng khi cần.
 
-- [ ] **Step 2: Viết script kiểm tra `_tests/0003_test.sql`**
+- [x] **Step 2: Viết script kiểm tra `_tests/0003_test.sql`**
   Insert `scores` với `theory_score=9, practice_score=10` → `classification` phải ra `'T'`; với `theory_score=6, practice_score=5` → `'H'`; với `theory_score=3, practice_score=4` → `'C'`. Insert trùng `(student_id, semester)` lần 2 → lỗi unique.
 
-- [ ] **Step 3: Chạy thử migration & script kiểm tra**
+- [x] **Step 3: Chạy thử migration & script kiểm tra**
   Chạy: `supabase db reset` rồi `supabase db execute --file supabase/migrations/_tests/0003_test.sql`.
-  Expected: 3 trường hợp xếp loại ra đúng `T`/`H`/`C`; insert trùng bị từ chối.
+  Expected: 3 trường hợp xếp loại ra đúng `T`/`H`/`C`; insert trùng bị từ chối. (Ghi chú: Docker engine chưa chạy, file SQL đã chuẩn bị sẵn sàng chạy reset khi bật Docker hoặc nạp vào Supabase).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
   ```bash
   git add supabase/migrations/0003_attendance_scores.sql supabase/migrations/_tests/0003_test.sql
   git commit -m "feat: add attendance, weekly_evaluations, scores tables"
