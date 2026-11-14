@@ -126,15 +126,44 @@
 
 ---
 
+### Giai đoạn 2C: Ngân hàng câu hỏi & Kết quả thi sang Supabase
+Đã hoàn thành 4 Task đưa toàn bộ hệ thống Trắc nghiệm và Bảng điểm thi sang Supabase:
+
+1. **Task 1: quizService (Phía Giáo viên)**
+   - File: `src/services/quizService.ts`
+   - `listTopics()`: Lấy danh sách chủ đề thi, đếm chính xác số câu hỏi qua `quiz_questions(count)`.
+   - `createTopic()`, `setTopicActive()`: Quản lý chủ đề thi.
+   - `listQuestionsByTopic()`, `createQuestion()`, `deleteQuestion()`: Thao tác CRUD câu hỏi trong ngân hàng đề.
+   - `listExamResults()`: Đọc kết quả thi học sinh từ `quiz_results` join `quiz_sessions`.
+   - Unit test: `src/services/__tests__/quizService.test.ts` (PASS 5/5).
+
+2. **Task 2: examService (Phía Học sinh) & Prevent Duplicate Submission**
+   - Migration: `supabase/migrations/0009_quiz_results_unique_session.sql` thêm unique constraint trên `session_id`.
+   - File: `src/services/examService.ts`
+   - `listActiveTopics(grade)`: Lấy các chủ đề đang bật.
+   - `startExamSession()`: Tạo phiên thi, chỉ đọc câu hỏi an toàn từ View `quiz_questions_public` (không chứa cột đáp án).
+   - `submitExamResult()`: Nộp bài bằng upsert theo `session_id`, validate thời lượng làm bài > 0.
+   - Unit test: `src/services/__tests__/examService.test.ts` (PASS 4/4).
+
+3. **Task 3: Nối QuizBank UI vào quizService / examService**
+   - File: `src/components/QuizBank.tsx`: Tải kết quả thi học sinh trực tiếp từ `quizService.listExamResults`.
+
+4. **Task 4: Nối StudentPortal UI vào examService**
+   - File: `src/components/StudentPortal.tsx`: Tích hợp nộp bài thi trắc nghiệm lưu kết quả vào Supabase `quiz_results`.
+
+---
+
 ## 3. Kết quả kiểm thử & Chất lượng mã nguồn
 
-- **Unit Test (Vitest)**: Toàn bộ **20/20 test cases đều PASS**.
+- **Unit Test (Vitest)**: Toàn bộ **29/29 test cases đều PASS**.
   - `src/lib/__tests__/supabaseClient.test.ts`: 1 passed.
   - `src/services/__tests__/authService.test.ts`: 4 passed.
   - `src/services/__tests__/classesService.test.ts`: 4 passed.
   - `src/services/__tests__/studentsService.test.ts`: 4 passed.
   - `src/services/__tests__/attendanceService.test.ts`: 4 passed.
   - `src/services/__tests__/scoresService.test.ts`: 3 passed.
+  - `src/services/__tests__/quizService.test.ts`: 5 passed.
+  - `src/services/__tests__/examService.test.ts`: 4 passed.
 - **TypeScript Static Analysis (`tsc --noEmit`)**: **0 Lỗi** (Không có cảnh báo hay lỗi kiểu dữ liệu).
 
 ---
