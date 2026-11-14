@@ -164,7 +164,7 @@
   - `upsertStudents(classId: string, students: Array<{ code: string; name: string; gender: 'Nam'|'Nữ'; dob: string }>): Promise<Student[]>`
   - `deleteStudent(id: string): Promise<void>`
 
-- [ ] **Step 1: Viết test trùng mã học sinh (Review Focus #4)**
+- [x] **Step 1: Viết test trùng mã học sinh (Review Focus #4)**
   ```ts
   test('upsertStudents bao loi khi trung student_code trong cung lop', async () => {
     await upsertStudents(classId, [{ code: 'HS001', name: 'A', gender: 'Nam', dob: '2018-01-01' }]);
@@ -174,13 +174,13 @@
   });
   ```
 
-- [ ] **Step 2: Chạy test, xác nhận fail**
+- [x] **Step 2: Chạy test, xác nhận fail**
   Expected: FAIL vì `studentsService` chưa tồn tại.
 
-- [ ] **Step 3: Implement 3 hàm**
+- [x] **Step 3: Implement 3 hàm**
   `upsertStudents`: dùng `supabase.from('students').insert(...)` — **không** dùng `upsert` tự động đè (vì schema Giai đoạn 1 chỉ có `unique(class_id, student_code)`, không có cột `id` nghiệp vụ để upsert theo); nếu `student_code` trùng, để lỗi unique của Postgres nổi lên nguyên văn (không nuốt lỗi), đúng Global Constraints "báo lỗi rõ ràng". `listStudentsByClass`/`deleteStudent`: thẳng theo Supabase, map cột `student_code → code`.
 
-- [ ] **Step 4: Viết test "học sinh đọc nhầm lớp khác" (Review Focus #5)**
+- [x] **Step 4: Viết test "học sinh đọc nhầm lớp khác" (Review Focus #5)**
   ```ts
   test('listStudentsByClass tra mang rong neu khong co quyen', async () => {
     // dang nhap hoc sinh qua room_code cua lop A (authService.signInStudentWithRoomCode)
@@ -189,10 +189,10 @@
   });
   ```
 
-- [ ] **Step 5: Chạy lại toàn bộ test**
+- [x] **Step 5: Chạy lại toàn bộ test**
   Expected: PASS cả 2.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
   ```bash
   git add src/services/studentsService.ts src/services/__tests__/studentsService.test.ts
   git commit -m "feat: add studentsService backed by Supabase"
