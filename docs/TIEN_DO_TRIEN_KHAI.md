@@ -224,9 +224,28 @@
 
 ---
 
+### Giai đoạn 3C: Học liệu số/Tiện ích (Lưu link) & Giải trí (Thêm thẻ game)
+Đã hoàn thành 3 Task:
+
+1. **Task 1: Form lưu liên kết website cho Học liệu số và Tiện ích**
+   - File: `src/components/resources/SaveLinkForm.tsx`: Nhập tiêu đề, URL, chọn khối lớp, hiển thị lỗi validate inline ngay dưới ô nhập.
+   - Nối vào `DigitalResources.tsx` và `UtilitiesSection.tsx` (thêm tab Liên kết tiện ích).
+   - Đảm bảo lưu đúng `type: 'link'` và tải lại danh sách tức thì.
+
+2. **Task 2: Form thêm thẻ trò chơi giáo dục 16:9 cho Giải trí**
+   - Migration: `supabase/migrations/0012_resource_images_storage_policy.sql` tạo bucket `resource-images` với RLS public select, authenticated insert/delete.
+   - Component: `src/components/resources/GameCardForm.tsx`: Cho phép upload ảnh hoặc nhập link, tự động kiểm tra tỉ lệ ảnh (khuyên dùng chuẩn 16:9 ~ 1.78:1).
+   - Nối vào `GamesSection.tsx`: Hiển thị danh sách card game trực tuyến, nút kích hoạt mở/tắt cho học sinh, nút mở chơi thử và nút xóa.
+
+3. **Task 3: Hiển thị phía học sinh (StudentPortal.tsx)**
+   - Tích hợp tải danh sách link tài nguyên và thẻ game được kích hoạt (`is_active = true`) từ Supabase `resourcesService`.
+   - Bổ sung cơ chế bảo vệ link hỏng hoặc rỗng (báo lỗi thân thiện, không làm trắng trang khi liên kết bị gỡ).
+
+---
+
 ## 3. Kết quả kiểm thử & Chất lượng mã nguồn
 
-- **Unit Test (Vitest)**: Toàn bộ **46/46 test cases đều PASS**.
+- **Unit Test (Vitest)**: Toàn bộ **48/48 test cases đều PASS**.
   - `src/lib/__tests__/supabaseClient.test.ts`: 1 passed.
   - `src/services/__tests__/authService.test.ts`: 4 passed.
   - `src/services/__tests__/classesService.test.ts`: 4 passed.
