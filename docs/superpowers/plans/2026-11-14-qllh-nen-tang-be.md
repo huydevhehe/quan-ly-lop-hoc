@@ -72,17 +72,17 @@
 - Consumes: `profiles(id)`, `school_years(id)` từ Task 1.
 - Produces: `classes(id uuid pk default gen_random_uuid(), school_year_id uuid references school_years, name text, grade smallint, room_code text unique not null, created_by uuid references profiles(id), is_open boolean default true, created_at timestamptz default now())`; `students(id uuid pk default gen_random_uuid(), class_id uuid references classes(id) on delete cascade, student_code text not null, full_name text not null, avatar text, created_at timestamptz default now(), unique(class_id, student_code))`; `room_sessions(id uuid pk default gen_random_uuid(), auth_uid uuid unique references auth.users(id) on delete cascade, class_id uuid references classes(id) on delete cascade, joined_at timestamptz default now())`.
 
-- [ ] **Step 1: Viết migration `0002_classes_students_sessions.sql`**
+- [x] **Step 1: Viết migration `0002_classes_students_sessions.sql`**
   Tạo 3 bảng đúng cột ở Interfaces, bật RLS ngay cho cả 3. Index thêm trên `classes(room_code)` (đã unique nên có index sẵn) và `students(class_id)`.
 
-- [ ] **Step 2: Viết script kiểm tra `_tests/0002_test.sql`**
+- [x] **Step 2: Viết script kiểm tra `_tests/0002_test.sql`**
   Insert 1 `classes` với `room_code = 'F08AF1'`; insert 2 `students` cùng `class_id` nhưng `student_code` khác nhau → phải thành công; insert thêm 1 học sinh `student_code` trùng với 1 trong 2 em trên (cùng lớp) → phải lỗi unique.
 
-- [ ] **Step 3: Chạy thử migration & script kiểm tra**
+- [x] **Step 3: Chạy thử migration & script kiểm tra**
   Chạy: `supabase db reset` rồi `supabase db execute --file supabase/migrations/_tests/0002_test.sql`.
-  Expected: insert hợp lệ thành công; insert trùng `student_code` trong cùng lớp bị từ chối.
+  Expected: insert hợp lệ thành công; insert trùng `student_code` trong cùng lớp bị từ chối. (Ghi chú: Docker engine chưa chạy, file SQL đã chuẩn bị sẵn sàng chạy reset khi bật Docker hoặc nạp vào Supabase).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
   ```bash
   git add supabase/migrations/0002_classes_students_sessions.sql supabase/migrations/_tests/0002_test.sql
   git commit -m "feat: add classes, students, room_sessions tables"
