@@ -21,7 +21,10 @@ import {
   getSavedGrades,
   getSavedCurrentYear,
 } from '../utils/dbStorage';
-import { getClassScores, saveScore } from '../services/scoresService';
+import { getClassScores, saveScore, getClassStats, ClassStats } from '../services/scoresService';
+import { ClassificationPieChart } from './reports/ClassificationPieChart';
+import { ScoreAttendanceBarChart } from './reports/ScoreAttendanceBarChart';
+import { WarningBanner } from './reports/WarningBanner';
 
 interface ClassItem {
   id: string;

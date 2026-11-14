@@ -80,25 +80,25 @@
 - Consumes: `scoresService.getClassStats` (Task 1).
 - Produces: `<ClassificationPieChart data={classificationCounts} />`, `<ScoreAttendanceBarChart scoreBuckets={...} absenceBuckets={...} />`, `<WarningBanner missingScoreCount={number} needsAttentionCount={number} />` (banner tự ẩn khi cả 2 số = 0 — Review Focus #3).
 
-- [ ] **Step 1: Cài thư viện**
+- [x] **Step 1: Cài thư viện**
   Chạy: `npm install recharts`.
 
-- [ ] **Step 2: Viết `ClassificationPieChart.tsx`**
+- [x] **Step 2: Viết `ClassificationPieChart.tsx`**
   Dùng `PieChart` của `recharts`, 4 phần (T xanh lá, H xanh dương/tím, C cam, "Chưa có điểm" xám) đúng màu đã ghi trong yêu cầu gốc.
 
-- [ ] **Step 3: Viết `ScoreAttendanceBarChart.tsx`**
+- [x] **Step 3: Viết `ScoreAttendanceBarChart.tsx`**
   Dùng `BarChart`, trục X 5 mốc (9-10, 7-8, 5-6, dưới 5, số buổi vắng), trục Y số lượng học sinh.
 
-- [ ] **Step 4: Viết `WarningBanner.tsx`**
+- [x] **Step 4: Viết `WarningBanner.tsx`**
   Props `missingScoreCount`/`needsAttentionCount`; `return null` nếu cả 2 bằng 0 (Review Focus #3); nội dung text động đúng mẫu "Phát hiện {n} học sinh chưa có điểm và {m} học sinh cần lưu ý về chuyên cần."
 
-- [ ] **Step 5: Nối vào `ReportsSection.tsx`**
+- [x] **Step 5: Nối vào `ReportsSection.tsx`**
   Thêm ô tìm kiếm học sinh (debounce ~300ms theo đúng yêu cầu gốc), 4 nút lọc nhanh (Tất cả / Chưa có điểm / Cần lưu ý / Top 5 xuất sắc — logic Top 5 xử lý tie-break theo chuyên cần, Review Focus #5), gọi `getClassStats` hiển thị 2 biểu đồ + banner phía trên bảng điểm hiện có.
 
-- [ ] **Step 6: Kiểm tra thủ công**
+- [x] **Step 6: Kiểm tra thủ công**
   `npm run dev`: thử lọc, tìm kiếm, xem biểu đồ đổi theo lớp/học kỳ đang chọn, thử với 1 lớp có 0 học sinh và 1 lớp có học sinh chưa chấm điểm (Review Focus #1, #2).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
   ```bash
   git add package.json package-lock.json src/components/ReportsSection.tsx src/components/reports/
   git commit -m "feat: add charts, quick filters and warning banner to reports"
