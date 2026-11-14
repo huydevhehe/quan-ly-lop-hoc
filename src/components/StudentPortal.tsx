@@ -6,8 +6,6 @@ import {
   RotateCcw,
   Sparkles,
   Clock,
-  CheckCircle2,
-  XCircle,
   HelpCircle,
   ChevronRight,
   ChevronLeft,
@@ -24,17 +22,17 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { QuizQuestion, QuizSubmission, Classroom, DigitalResource, Resource } from '../types';
+import { QuizSubmission, Classroom, DigitalResource, Resource, Student } from '../types';
 import { soundManager } from '../utils/audio';
 import { signInStudentWithRoomCode } from '../services/authService';
-import { listActiveTopics, startExamSession, submitExamResult } from '../services/examService';
+import { listActiveTopics, startExamSession, submitExamSession, ExamQuestion } from '../services/examService';
 import { listResources } from '../services/resourcesService';
+import { listStudentsByClass } from '../services/studentsService';
 
 interface StudentPortalProps {
   roomCode: string;
   teacherUsername?: string;
   classrooms: Classroom[];
-  quizzes: QuizQuestion[];
   resources: DigitalResource[];
   onOpenTeacherLogin: () => void;
   onRecordSubmission?: (sub: QuizSubmission) => void;
@@ -44,7 +42,6 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
   roomCode,
   teacherUsername = 'trungkienkd2025',
   classrooms,
-  quizzes,
   resources,
   onOpenTeacherLogin,
   onRecordSubmission,
@@ -60,22 +57,28 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
   const [enteredCode, setEnteredCode] = useState('');
   const [codeError, setCodeError] = useState('');
 
+  // Lớp thật đã xác nhận qua mã phòng (dùng để lấy đúng danh sách học sinh thật của lớp)
+  const [joinedClassId, setJoinedClassId] = useState<string | null>(null);
+  const [rosterStudents, setRosterStudents] = useState<Student[]>([]);
+  const [isPreparingExam, setIsPreparingExam] = useState(false);
+
   // Selected grade in Hub (Khối 1 to 5)
   const [selectedGrade, setSelectedGrade] = useState<number>(4);
 
   // Student Info Modal for starting quiz
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
   const [studentName, setStudentName] = useState('');
-  const [studentClass, setStudentClass] = useState('');
+  const [pendingTopicIds, setPendingTopicIds] = useState<string[]>([]);
 
   // Quiz Taking state
-  const [activeQuizList, setActiveQuizList] = useState<QuizQuestion[]>([]);
+  const [activeQuizList, setActiveQuizList] = useState<ExamQuestion[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [studentAnswers, setStudentAnswers] = useState<Record<number, number>>({});
   const [timeRemaining, setTimeRemaining] = useState(900); // 15 mins = 900s
   const [startTime, setStartTime] = useState<number>(0);
   const [latestSubmission, setLatestSubmission] = useState<QuizSubmission | null>(null);
+  const [isSubmittingExam, setIsSubmittingExam] = useState(false);
 
   // Digital resources & game preview modal
   const [activeResourceModal, setActiveResourceModal] = useState<DigitalResource | null>(null);
@@ -120,6 +123,12 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
         return;
       }
 
+      setJoinedClassId(result.classId);
+      // Tải danh sách học sinh thật của đúng lớp này để học sinh chọn tên khi làm bài
+      listStudentsByClass(result.classId)
+        .then(setRosterStudents)
+        .catch(() => setRosterStudents([]));
+
       soundManager.playFanfare();
       confetti({
         particleCount: 40,
@@ -133,25 +142,44 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
     }
   };
 
-  // Open Name Input Modal
-  const handlePrepareQuiz = () => {
-    // Filter questions for this grade
-    const gradeQuestions = quizzes.filter((q) => q.grade === selectedGrade);
-    if (gradeQuestions.length === 0) {
-      alert(`Hiện tại chưa có câu hỏi trắc nghiệm cho Khối ${selectedGrade}. Thầy cô có thể thêm trong phần quản trị!`);
-      return;
+  // Open Name Input Modal: kiểm tra trước xem khối này có chủ đề thi nào đang kích hoạt không
+  const handlePrepareQuiz = async () => {
+    setIsPreparingExam(true);
+    try {
+      const topics = await listActiveTopics(selectedGrade);
+      if (topics.length === 0) {
+        alert(`Hiện tại chưa có đề thi trắc nghiệm cho Khối ${selectedGrade}. Thầy cô có thể bật đề trong phần quản trị!`);
+        return;
+      }
+      setPendingTopicIds(topics.map((t) => t.id));
+      soundManager.playStarSound();
+      setIsNameModalOpen(true);
+    } catch (err: any) {
+      alert(err.message || 'Không thể tải đề thi, vui lòng thử lại.');
+    } finally {
+      setIsPreparingExam(false);
     }
-    soundManager.playStarSound();
-    setIsNameModalOpen(true);
   };
 
-  // Start the timed quiz
-  const handleStartExam = (e: React.FormEvent) => {
+  // Start the timed quiz: tạo phiên thi thật trên server (câu hỏi xáo trộn, không lộ đáp án đúng)
+  const handleStartExam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentName.trim()) return;
 
-    const gradeQuestions = quizzes.filter((q) => q.grade === selectedGrade);
-    setActiveQuizList(gradeQuestions);
+    try {
+      const { sessionId, questions } = await startExamSession(
+        studentName.trim(),
+        joinedClassId,
+        false,
+        pendingTopicIds
+      );
+      setCurrentSessionId(sessionId);
+      setActiveQuizList(questions);
+    } catch (err: any) {
+      alert(err.message || 'Không thể bắt đầu bài thi, vui lòng thử lại.');
+      return;
+    }
+
     setCurrentQIndex(0);
     setStudentAnswers({});
     setTimeRemaining(900);
@@ -183,62 +211,53 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
     };
   }, [currentView, timeRemaining]);
 
-  // Submit the student's exam
-  const handleSubmitExam = () => {
+  // Submit the student's exam: gửi câu trả lời lên server để server tự chấm điểm (không lộ đáp án đúng ở máy học sinh)
+  const handleSubmitExam = async () => {
+    if (!currentSessionId || isSubmittingExam) return;
+    setIsSubmittingExam(true);
+
     const elapsedSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-    let correctCount = 0;
+    const answers = activeQuizList.map((q, idx) => ({
+      questionId: q.id,
+      selectedOptionIndex: studentAnswers[idx] ?? -1,
+    }));
 
-    const details = activeQuizList.map((q, idx) => {
-      const chosen = studentAnswers[idx] ?? -1;
-      const isCorrect = chosen === q.correctIndex;
-      if (isCorrect) correctCount++;
-      return {
-        questionId: q.id,
-        question: q.question,
-        selectedOption: chosen,
-        correctOption: q.correctIndex,
-        isCorrect
+    try {
+      const result = await submitExamSession(currentSessionId, answers, elapsedSeconds);
+
+      const now = new Date();
+      const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+      const submission: QuizSubmission = {
+        id: currentSessionId,
+        studentName: studentName.trim(),
+        className: classrooms.find((c) => c.id === joinedClassId)?.name || 'Tự do',
+        grade: selectedGrade,
+        score: result.score,
+        totalQuestions: result.totalQuestions,
+        correctAnswers: result.correctCount,
+        submittedAt: formattedDate,
+        durationSeconds: elapsedSeconds,
       };
-    });
 
-    const total = activeQuizList.length || 1;
-    // Điểm số trên thang điểm 10 làm tròn 1 chữ số thập phân
-    const calculatedScore = Math.round((correctCount / total) * 10 * 10) / 10;
+      setLatestSubmission(submission);
+      setCurrentView('quiz_result');
 
-    const now = new Date();
-    const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      if (onRecordSubmission) {
+        onRecordSubmission(submission);
+      }
 
-    const submission: QuizSubmission = {
-      id: `sub_${Date.now()}`,
-      studentName: studentName.trim(),
-      className: studentClass.trim() || 'Tự do',
-      grade: selectedGrade,
-      score: calculatedScore,
-      totalQuestions: total,
-      correctAnswers: correctCount,
-      submittedAt: formattedDate,
-      durationSeconds: elapsedSeconds,
-      details
-    };
-
-    setLatestSubmission(submission);
-    setCurrentView('quiz_result');
-
-    // Nộp kết quả bài thi lên Supabase quiz_results (upsert session_id)
-    if (currentSessionId) {
-      submitExamResult(currentSessionId, correctCount, total, elapsedSeconds).catch(() => {});
+      soundManager.playFanfare();
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.5 }
+      });
+    } catch (err: any) {
+      alert(err.message || 'Không thể nộp bài thi, vui lòng thử lại.');
+    } finally {
+      setIsSubmittingExam(false);
     }
-
-    if (onRecordSubmission) {
-      onRecordSubmission(submission);
-    }
-
-    soundManager.playFanfare();
-    confetti({
-      particleCount: 80,
-      spread: 70,
-      origin: { y: 0.5 }
-    });
   };
 
   const formatTime = (secs: number) => {
@@ -248,7 +267,6 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
   };
 
   // Grade count for display badge
-  const questionsInGrade = quizzes.filter((q) => q.grade === selectedGrade).length;
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex flex-col font-sans">
@@ -460,7 +478,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
               </div>
               <div className="px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-xs flex items-center gap-1.5 text-white">
                 <span>📝</span>
-                <span>Số câu: {questionsInGrade > 0 ? questionsInGrade : 10} câu</span>
+                <span>Số câu: tối đa 10 câu</span>
               </div>
               <div className="px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-xs flex items-center gap-1.5 text-white">
                 <span>⏱️</span>
@@ -473,9 +491,10 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
               {/* Start Quiz button (Vibrant Orange) */}
               <button
                 onClick={handlePrepareQuiz}
-                className="px-6 sm:px-8 py-3.5 bg-[#ea580c] hover:bg-[#c2410c] text-white rounded-full font-bold text-sm sm:text-base shadow-lg shadow-orange-600/30 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+                disabled={isPreparingExam}
+                className="px-6 sm:px-8 py-3.5 bg-[#ea580c] hover:bg-[#c2410c] text-white rounded-full font-bold text-sm sm:text-base shadow-lg shadow-orange-600/30 active:scale-95 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                <span>Bắt đầu làm bài</span>
+                <span>{isPreparingExam ? 'Đang tải đề...' : 'Bắt đầu làm bài'}</span>
               </button>
 
               {/* Digital Resources button */}
@@ -533,43 +552,43 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
             <form onSubmit={handleStartExam} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Họ và tên của em <span className="text-rose-500">*</span>
+                  Em là bạn nào trong lớp? <span className="text-rose-500">*</span>
                 </label>
-                <div className="relative">
-                  <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={studentName}
-                    onChange={(e) => setStudentName(e.target.value)}
-                    placeholder="Ví dụ: Nguyễn An Khang"
-                    className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-sky-500"
-                    required
-                    autoFocus
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
-                  <span>Lớp của em</span>
-                  <span className="text-slate-400 font-normal text-[11px]">(Có thể để trống)</span>
-                </label>
-                <div className="relative">
-                  <GraduationCap className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={studentClass}
-                    onChange={(e) => setStudentClass(e.target.value)}
-                    placeholder="Ví dụ: 4A1 (hoặc để trống)"
-                    list="classes-list"
-                    className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-sky-500"
-                  />
-                  <datalist id="classes-list">
-                    {classrooms.map((c) => (
-                      <option key={c.id} value={c.name} />
-                    ))}
-                  </datalist>
-                </div>
+                {rosterStudents.length > 0 ? (
+                  <div className="relative">
+                    <GraduationCap className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <select
+                      value={studentName}
+                      onChange={(e) => setStudentName(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-sky-500 bg-white appearance-none"
+                      required
+                      autoFocus
+                    >
+                      <option value="">-- Chọn tên của em --</option>
+                      {rosterStudents.map((s) => (
+                        <option key={s.id} value={s.name}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={studentName}
+                      onChange={(e) => setStudentName(e.target.value)}
+                      placeholder="Ví dụ: Nguyễn An Khang"
+                      className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-sky-500"
+                      required
+                      autoFocus
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Lớp chưa có danh sách học sinh nên em tự nhập tên nhé.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
@@ -614,9 +633,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
               </div>
               <div>
                 <p className="text-xs text-slate-400">Học sinh:</p>
-                <p className="font-bold text-xs text-slate-800">
-                  {studentName} {studentClass ? `(${studentClass})` : ''}
-                </p>
+                <p className="font-bold text-xs text-slate-800">{studentName}</p>
               </div>
             </div>
 
@@ -638,9 +655,10 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                   handleSubmitExam();
                 }
               }}
-              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-2xs cursor-pointer transition-colors"
+              disabled={isSubmittingExam}
+              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-2xs cursor-pointer transition-colors disabled:opacity-50"
             >
-              Nộp bài thi
+              {isSubmittingExam ? 'Đang nộp...' : 'Nộp bài thi'}
             </button>
           </div>
 
@@ -651,13 +669,10 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                 <span className="font-semibold text-sky-600 bg-sky-50 px-2.5 py-1 rounded-md">
                   Câu hỏi {currentQIndex + 1} / {activeQuizList.length}
                 </span>
-                <span className="truncate max-w-[240px]">
-                  {activeQuizList[currentQIndex].topic}
-                </span>
               </div>
 
               <h3 className="text-lg sm:text-xl font-bold text-slate-900 leading-relaxed">
-                {activeQuizList[currentQIndex].question}
+                {activeQuizList[currentQIndex].content}
               </h3>
 
               {/* Options */}
@@ -743,9 +758,10 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                   <button
                     type="button"
                     onClick={handleSubmitExam}
-                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-2xs"
+                    disabled={isSubmittingExam}
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-2xs disabled:opacity-50"
                   >
-                    Nộp bài
+                    {isSubmittingExam ? 'Đang nộp...' : 'Nộp bài'}
                   </button>
                 )}
               </div>
@@ -823,50 +839,11 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
               </span>
             </div>
 
-            {/* Answer Details Accordion */}
-            {latestSubmission.details && (
-              <div className="text-left space-y-3 pt-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Chi tiết từng câu hỏi:
-                </h4>
-                <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
-                  {latestSubmission.details.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-3 rounded-xl border text-xs space-y-1 ${
-                        item.isCorrect
-                          ? 'bg-emerald-50/50 border-emerald-200'
-                          : 'bg-rose-50/50 border-rose-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between font-bold">
-                        <span className="text-slate-800">
-                          Câu {idx + 1}: {item.question}
-                        </span>
-                        {item.isCorrect ? (
-                          <span className="text-emerald-700 flex items-center gap-1 shrink-0">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Đúng
-                          </span>
-                        ) : (
-                          <span className="text-rose-600 flex items-center gap-1 shrink-0">
-                            <XCircle className="w-3.5 h-3.5" /> Sai
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-slate-600 text-[11px]">
-                        Em chọn:{' '}
-                        <strong>
-                          {item.selectedOption >= 0
-                            ? String.fromCharCode(65 + item.selectedOption)
-                            : 'Chưa chọn'}
-                        </strong>{' '}
-                        | Đáp án đúng:{' '}
-                        <strong className="text-emerald-700">
-                          {String.fromCharCode(65 + item.correctOption)}
-                        </strong>
-                      </p>
-                    </div>
-                  ))}
+            {/* Lưu ý: không hiện lại đáp án đúng từng câu ở đây để tránh lộ đề cho bạn làm sau */}
+            {(
+              <div className="text-left pt-2">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500 text-center">
+                  Đáp án chi tiết sẽ được Thầy Cô công bố trên lớp để tránh lộ đề cho các bạn làm sau nhé!
                 </div>
               </div>
             )}

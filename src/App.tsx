@@ -394,7 +394,6 @@ export default function App() {
           roomCode={roomCode}
           teacherUsername={currentUser.role === 'admin' || currentUser.role === 'teacher' ? currentUser.username : 'trungkienkd2025'}
           classrooms={classrooms}
-          quizzes={quizzes}
           resources={resources}
           onOpenTeacherLogin={() => setIsLoginModalOpen(true)}
         />
