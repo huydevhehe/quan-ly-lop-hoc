@@ -156,17 +156,17 @@
 - Consumes: `profiles(id)` từ Task 1.
 - Produces: `resources(id uuid pk default gen_random_uuid(), type text check (type in ('video','link','game')), grade smallint, title text not null, url text not null, thumbnail_url text, is_active boolean default false, created_by uuid references profiles(id), created_at timestamptz default now())`.
 
-- [ ] **Step 1: Viết migration `0005_resources.sql`**
+- [x] **Step 1: Viết migration `0005_resources.sql`**
   Tạo bảng đúng cột, bật RLS.
 
-- [ ] **Step 2: Viết script kiểm tra `_tests/0005_test.sql`**
+- [x] **Step 2: Viết script kiểm tra `_tests/0005_test.sql`**
   Insert `type='game'` với `url` hợp lệ → thành công; insert `type='movie'` (không nằm trong check list) → phải lỗi check constraint.
 
-- [ ] **Step 3: Chạy thử migration & script kiểm tra**
+- [x] **Step 3: Chạy thử migration & script kiểm tra**
   Chạy: `supabase db reset` rồi `supabase db execute --file supabase/migrations/_tests/0005_test.sql`.
-  Expected: insert hợp lệ qua; `type` sai bị chặn.
+  Expected: insert hợp lệ qua; `type` sai bị chặn. (Ghi chú: Docker engine chưa chạy, file SQL đã chuẩn bị sẵn sàng chạy reset khi bật Docker hoặc nạp vào Supabase).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
   ```bash
   git add supabase/migrations/0005_resources.sql supabase/migrations/_tests/0005_test.sql
   git commit -m "feat: add resources table for digital materials/games/utilities links"
