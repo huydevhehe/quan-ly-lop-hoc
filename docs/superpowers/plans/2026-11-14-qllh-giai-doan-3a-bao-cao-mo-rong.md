@@ -116,19 +116,19 @@
 - Consumes: `attendanceService` (đếm buổi vắng theo học sinh, Giai đoạn 2B); `scoresService`.
 - Produces: `<StudentQuickProfilePopup studentId={string} onViewDetail={() => void} onClose={() => void} />`.
 
-- [ ] **Step 1: Thêm cột Chuyên cần vào bảng điểm**
+- [x] **Step 1: Thêm cột Chuyên cần vào bảng điểm**
   Hiển thị dạng "X vắng có phép / Y vắng không phép" (đếm từ `attendance` theo học sinh); highlight nền cam/đỏ nhạt nếu `Y > 0`.
 
-- [ ] **Step 2: Thêm cột Hành động (xem/sửa/xóa)**
+- [x] **Step 2: Thêm cột Hành động (xem/sửa/xóa)**
   Nút sửa mở modal nhập nhanh điểm/nhận xét (tái dùng form đã có, không viết modal mới từ đầu nếu `ClassroomManager.tsx` đã có sẵn dạng tương tự); nút xóa hiện `confirm()` trước khi xóa thật (đúng yêu cầu gốc).
 
-- [ ] **Step 3: Viết `StudentQuickProfilePopup.tsx`**
+- [x] **Step 3: Viết `StudentQuickProfilePopup.tsx`**
   Hiện khi hover/click tên học sinh (delay ~200-300ms nếu hover, theo đúng yêu cầu gốc): avatar, tên, sparkline điểm các tuần (dùng `recharts` `LineChart` thu nhỏ, không trục/lưới), dòng nhận xét mới nhất, trạng thái chuyên cần, nút "Xem chi tiết". Click ra ngoài vùng popup tự đóng.
 
-- [ ] **Step 4: Kiểm tra thủ công (Review Focus #4 áp dụng gián tiếp qua Task 4, ở đây chỉ kiểm tra popup hoạt động đúng)**
+- [x] **Step 4: Kiểm tra thủ công (Review Focus #4 áp dụng gián tiếp qua Task 4, ở đây chỉ kiểm tra popup hoạt động đúng)**
   Hover/click vài học sinh có và không có nhận xét, xem popup hiện đúng dữ liệu, không bị lag/nháy liên tục.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
   ```bash
   git add src/components/ReportsSection.tsx src/components/reports/StudentQuickProfilePopup.tsx
   git commit -m "feat: add attendance column, row actions and quick profile popup"
