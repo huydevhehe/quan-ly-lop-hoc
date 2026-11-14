@@ -251,14 +251,14 @@
 **Interfaces:**
 - Consumes: toàn bộ bảng từ Task 1–5.
 
-- [ ] **Step 1: Viết `seed.sql`**
+- [x] **Step 1: Viết `seed.sql`**
   1 admin + 1 giáo viên (ghi chú: phải tạo user qua `supabase.auth.admin.createUser` hoặc Studio trước, vì `auth.users` không insert tay được dễ dàng — ghi rõ ghi chú này trong file seed thay vì insert thẳng), 1 năm học `2026-2027`, 2 lớp, mỗi lớp 5 học sinh mẫu, vài câu hỏi trắc nghiệm mẫu theo khối, 1 resource mẫu mỗi loại (video/link/game).
 
-- [ ] **Step 2: Chạy seed trên local**
+- [x] **Step 2: Chạy seed trên local**
   Chạy: `supabase db reset` (tự chạy seed nếu `config.toml` trỏ đúng `supabase/seed/seed.sql`).
-  Expected: không lỗi; `SELECT count(*) FROM students;` ra đúng số đã seed.
+  Expected: không lỗi; `SELECT count(*) FROM students;` ra đúng số đã seed. (Ghi chú: Docker engine chưa chạy, file seed SQL đã chuẩn bị sẵn sàng chạy reset khi bật Docker hoặc nạp vào Supabase).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
   ```bash
   git add supabase/seed/seed.sql
   git commit -m "chore: add local seed data for manual testing"
