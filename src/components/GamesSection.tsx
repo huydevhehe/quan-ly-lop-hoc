@@ -9,14 +9,40 @@ import {
   Activity,
   Smile,
   CheckCircle2,
-  Volume2
+  Volume2,
+  Play,
+  Trash2,
+  Power,
+  ExternalLink,
+  Plus,
+  XCircle,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { PRIZE_WHEEL_ITEMS } from '../data/mockData';
 import { soundManager } from '../utils/audio';
+import { GameCardForm } from './resources/GameCardForm';
+import { listResources, setResourceActive, deleteResource } from '../services/resourcesService';
+import { Resource } from '../types';
 
 export const GamesSection: React.FC = () => {
-  const [activeGame, setActiveGame] = useState<'wheel' | 'mysteryBox' | 'brainBreak'>('wheel');
+  const [activeGame, setActiveGame] = useState<'wheel' | 'mysteryBox' | 'brainBreak' | 'cards'>('wheel');
+  const [customGames, setCustomGames] = useState<Resource[]>([]);
+  const [showAddGameModal, setShowAddGameModal] = useState(false);
+
+  const fetchCustomGames = async () => {
+    try {
+      const data = await listResources('game');
+      setCustomGames(data);
+    } catch (e) {
+      console.warn('Lỗi tải danh sách game:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (activeGame === 'cards') {
+      fetchCustomGames();
+    }
+  }, [activeGame]);
 
   // Lucky Wheel state
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -286,6 +312,14 @@ export const GamesSection: React.FC = () => {
           >
             Vận động 2 phút
           </button>
+          <button
+            onClick={() => setActiveGame('cards')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              activeGame === 'cards' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-600'
+            }`}
+          >
+            Trò chơi trực tuyến ({customGames.length})
+          </button>
         </div>
       </div>
 
@@ -465,6 +499,149 @@ export const GamesSection: React.FC = () => {
               Đặt lại 2 phút
             </button>
           </div>
+        </div>
+      )}
+
+      {/* GAME 4: ONLINE GAME CARDS (16:9) */}
+      {activeGame === 'cards' && (
+        <div className="space-y-5 animate-in fade-in duration-150">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-3xl border border-slate-200 shadow-2xs">
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Gamepad2 className="w-4 h-4 text-indigo-600" />
+                <span>Kho thẻ trò chơi trực tuyến dành cho lớp học</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Các game được kích hoạt sẽ hiển thị trên trang của học sinh
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowAddGameModal((prev) => !prev)}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors shrink-0 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Thêm thẻ game mới</span>
+            </button>
+          </div>
+
+          {showAddGameModal && (
+            <GameCardForm
+              onSaved={() => {
+                setShowAddGameModal(false);
+                fetchCustomGames();
+              }}
+              onCancel={() => setShowAddGameModal(false)}
+            />
+          )}
+
+          {customGames.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-3xl border border-dashed border-slate-200">
+              <Gamepad2 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-slate-400 text-xs">Chưa có trò chơi nào được thêm.</p>
+              <button
+                onClick={() => setShowAddGameModal(true)}
+                className="mt-3 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl"
+              >
+                + Thêm trò chơi đầu tiên
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+              {customGames.map((game) => (
+                <div
+                  key={game.id}
+                  className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-2xs hover:shadow-md transition-all flex flex-col justify-between"
+                >
+                  <div>
+                    {/* Aspect 16:9 Thumbnail */}
+                    <div className="relative aspect-video w-full bg-slate-900 overflow-hidden">
+                      <img
+                        src={
+                          game.thumbnailUrl ||
+                          'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80'
+                        }
+                        alt={game.title}
+                        className="w-full h-full object-cover opacity-90 hover:scale-105 transition-transform duration-300"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute top-2.5 right-2.5">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold shadow-xs ${
+                            game.isActive
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-slate-800/80 text-slate-300'
+                          }`}
+                        >
+                          {game.isActive ? 'Đang mở cho HS' : 'Chưa kích hoạt'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-4">
+                      <h4 className="font-bold text-slate-900 text-sm leading-snug line-clamp-2">
+                        {game.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-400 mt-1 truncate font-mono">
+                        {game.url}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Actions: Kích hoạt, Mở chơi, Xóa */}
+                  <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <button
+                      onClick={async () => {
+                        try {
+                          await setResourceActive(game.id, !game.isActive);
+                          fetchCustomGames();
+                        } catch (err: any) {
+                          alert(`Lỗi: ${err.message}`);
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                        game.isActive
+                          ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                          : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                      }`}
+                    >
+                      <Power className="w-3.5 h-3.5" />
+                      <span>{game.isActive ? 'Tắt' : 'Kích hoạt'}</span>
+                    </button>
+
+                    <div className="flex items-center gap-1.5">
+                      <a
+                        href={game.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-1.5 rounded-xl bg-white border border-slate-200 text-indigo-600 hover:bg-indigo-50 transition-colors"
+                        title="Chơi thử game"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+
+                      <button
+                        onClick={async () => {
+                          if (confirm(`Bạn có chắc muốn xóa thẻ game "${game.title}"?`)) {
+                            try {
+                              await deleteResource(game.id);
+                              fetchCustomGames();
+                            } catch (err: any) {
+                              alert(`Lỗi khi xóa: ${err.message}`);
+                            }
+                          }
+                        }}
+                        className="p-1.5 rounded-xl bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Xóa thẻ game"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
