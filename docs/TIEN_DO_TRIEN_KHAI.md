@@ -101,13 +101,40 @@
 
 ---
 
+### Giai đoạn 2B: Điểm danh, Đánh giá tuần, Bảng điểm sang Supabase
+Đã hoàn thành 4 Task đưa các subsystem Điểm danh, Nhận xét tuần, và Bảng điểm sang kết nối trực tiếp với Supabase:
+
+1. **Task 1: attendanceService**
+   - File: `src/services/attendanceService.ts`
+   - `getWeekAttendance(classId, weekNumber)`: Lấy dữ liệu điểm danh theo lớp và tuần, join qua `students`.
+   - `saveWeekAttendance(weekNumber, records)`: Upsert mảng điểm danh theo `(student_id, week_number)` tránh trùng lặp.
+   - `getWeekEvaluations(classId, weekNumber)` & `saveWeekEvaluation(studentId, weekNumber, comment)`: Quản lý nhận xét học sinh theo tuần.
+   - Unit test: `src/services/__tests__/attendanceService.test.ts` (PASS 4/4).
+
+2. **Task 2: scoresService & Score Range Constraint**
+   - Migration: `supabase/migrations/0008_scores_range_check.sql` bổ sung check constraint 0 <= điểm <= 10 cho `theory_score` và `practice_score`.
+   - File: `src/services/scoresService.ts`
+   - `getClassScores(classId, semester)`: Lấy điểm thi học kỳ 1 / Cả năm, đọc trực tiếp cột generated `classification` từ database.
+   - `saveScore(studentId, semester, theoryScore, practiceScore)`: Validate khoảng điểm [0, 10] và upsert vào database.
+   - Unit test: `src/services/__tests__/scoresService.test.ts` (PASS 3/3).
+
+3. **Task 3: Nối ClassroomManager (tab Tuần) vào attendanceService**
+   - File: `src/components/ClassroomManager.tsx`: Đồng bộ điểm danh và đánh giá tuần của học sinh vào `attendanceService`.
+
+4. **Task 4: Nối ReportsSection (tab Điểm) vào scoresService**
+   - File: `src/components/ReportsSection.tsx`: Tải bảng điểm trực tiếp từ `scoresService.getClassScores` theo học kỳ đã chọn.
+
+---
+
 ## 3. Kết quả kiểm thử & Chất lượng mã nguồn
 
-- **Unit Test (Vitest)**: Toàn bộ **13/13 test cases đều PASS**.
+- **Unit Test (Vitest)**: Toàn bộ **20/20 test cases đều PASS**.
   - `src/lib/__tests__/supabaseClient.test.ts`: 1 passed.
   - `src/services/__tests__/authService.test.ts`: 4 passed.
   - `src/services/__tests__/classesService.test.ts`: 4 passed.
   - `src/services/__tests__/studentsService.test.ts`: 4 passed.
+  - `src/services/__tests__/attendanceService.test.ts`: 4 passed.
+  - `src/services/__tests__/scoresService.test.ts`: 3 passed.
 - **TypeScript Static Analysis (`tsc --noEmit`)**: **0 Lỗi** (Không có cảnh báo hay lỗi kiểu dữ liệu).
 
 ---
