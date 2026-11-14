@@ -153,9 +153,31 @@
 
 ---
 
+### Giai đoạn 2D: Học liệu số, Giải trí, Tiện ích, Quản trị & Phân quyền sang Supabase
+Đã hoàn thành 4 Task đưa Học liệu, Tiện ích, Game và Quản trị phân quyền sang Supabase:
+
+1. **Task 1: Migration student_permissions & Edge Function create-staff-account**
+   - Migration: `supabase/migrations/0010_student_permissions.sql` tạo bảng phân quyền chung với RLS an toàn.
+   - Edge Function: `supabase/functions/create-staff-account/index.ts` (Deno) kiểm tra quyền admin và tạo tài khoản an toàn qua service role key server-side.
+
+2. **Task 2: resourcesService**
+   - File: `src/services/resourcesService.ts`
+   - Quản lý chung tài nguyên video, link học liệu và game giải trí với validate URL nghiêm ngặt.
+   - Unit test: `src/services/__tests__/resourcesService.test.ts` (PASS 5/5).
+
+3. **Task 3: adminService & studentPermissionsService**
+   - File: `src/services/adminService.ts`: Tạo tài khoản giáo viên mới qua Edge Function, gán lớp phụ trách.
+   - File: `src/services/studentPermissionsService.ts`: Đọc và cập nhật phân quyền xem của học sinh.
+   - Unit test: `src/services/__tests__/adminService.test.ts` (PASS 4/4).
+
+4. **Task 4: Nối UI**
+   - Cập nhật `DigitalResources.tsx` và `AdminPanel.tsx` gọi trực tiếp các service Supabase.
+
+---
+
 ## 3. Kết quả kiểm thử & Chất lượng mã nguồn
 
-- **Unit Test (Vitest)**: Toàn bộ **29/29 test cases đều PASS**.
+- **Unit Test (Vitest)**: Toàn bộ **38/38 test cases đều PASS**.
   - `src/lib/__tests__/supabaseClient.test.ts`: 1 passed.
   - `src/services/__tests__/authService.test.ts`: 4 passed.
   - `src/services/__tests__/classesService.test.ts`: 4 passed.
@@ -164,6 +186,8 @@
   - `src/services/__tests__/scoresService.test.ts`: 3 passed.
   - `src/services/__tests__/quizService.test.ts`: 5 passed.
   - `src/services/__tests__/examService.test.ts`: 4 passed.
+  - `src/services/__tests__/resourcesService.test.ts`: 5 passed.
+  - `src/services/__tests__/adminService.test.ts`: 4 passed.
 - **TypeScript Static Analysis (`tsc --noEmit`)**: **0 Lỗi** (Không có cảnh báo hay lỗi kiểu dữ liệu).
 
 ---
