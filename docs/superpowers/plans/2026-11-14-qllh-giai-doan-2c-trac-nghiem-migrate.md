@@ -144,15 +144,15 @@
 **Interfaces:**
 - Consumes: `examService` từ Task 2.
 
-- [ ] **Step 1: Đọc file, tìm đoạn chọn khối/chủ đề, bắt đầu làm bài, nộp bài**
+- [x] **Step 1: Đọc file, tìm đoạn chọn khối/chủ đề, bắt đầu làm bài, nộp bài**
 
-- [ ] **Step 2: Thay bằng `examService`**
+- [x] **Step 2: Thay bằng `examService`**
   Chọn chủ đề → `listActiveTopics`. Bắt đầu làm bài → `startExamSession`. Nộp bài → `submitExamResult`.
 
-- [ ] **Step 3: Kiểm tra thủ công**
+- [x] **Step 3: Kiểm tra thủ công**
   Mở 1 tab ẩn danh (giả lập học sinh), vào bằng mã phòng, chọn chủ đề, làm bài, nộp — xem GV có thấy kết quả mới trong `QuizBank.tsx` không.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
   ```bash
   git add src/components/StudentPortal.tsx
   git commit -m "feat: wire student exam flow to examService"

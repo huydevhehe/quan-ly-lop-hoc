@@ -27,6 +27,7 @@ import { QuizQuestion, QuizSubmission, Classroom, DigitalResource } from '../typ
 import { soundManager } from '../utils/audio';
 import { syncQuizSubmissionToFirestore } from '../firebase';
 import { signInStudentWithRoomCode } from '../services/authService';
+import { listActiveTopics, startExamSession, submitExamResult } from '../services/examService';
 
 interface StudentPortalProps {
   roomCode: string;
@@ -68,6 +69,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
 
   // Quiz Taking state
   const [activeQuizList, setActiveQuizList] = useState<QuizQuestion[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [studentAnswers, setStudentAnswers] = useState<Record<number, number>>({});
   const [timeRemaining, setTimeRemaining] = useState(900); // 15 mins = 900s
@@ -202,6 +204,11 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
 
     setLatestSubmission(submission);
     setCurrentView('quiz_result');
+
+    // Nộp kết quả bài thi lên Supabase quiz_results (upsert session_id)
+    if (currentSessionId) {
+      submitExamResult(currentSessionId, correctCount, total, elapsedSeconds).catch(() => {});
+    }
 
     // Sync to Firestore & Local
     syncQuizSubmissionToFirestore(submission);
