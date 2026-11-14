@@ -613,7 +613,7 @@ export const QuizBank: React.FC<QuizBankProps> = ({ quizzes, setQuizzes, isAdmin
                 <span className="text-xs font-semibold text-slate-400">Đồng bộ đám mây</span>
                 <span className="p-2 rounded-xl bg-sky-50 text-sky-600">☁️</span>
               </div>
-              <p className="text-xs font-bold text-sky-700 mt-2">Firebase Firestore</p>
+              <p className="text-xs font-bold text-sky-700 mt-2">Supabase</p>
               <p className="text-[11px] text-slate-400 mt-0.5">Tự động lưu & xem mọi máy</p>
             </div>
           </div>

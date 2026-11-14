@@ -123,7 +123,7 @@ export default function App() {
     localStorage.setItem('qllh_user_accounts', JSON.stringify(accounts));
   }, [accounts]);
 
-  // Lắng nghe sự kiện cập nhật tài khoản từ đám mây (Firestore)
+  // Lắng nghe sự kiện cập nhật tài khoản từ đám mây
   useEffect(() => {
     const handleAccountsSync = (e: any) => {
       if (e.detail?.accounts && Array.isArray(e.detail.accounts) && e.detail.accounts.length > 0) {
@@ -503,7 +503,7 @@ export default function App() {
                   onClick={handleManualSyncCloud}
                   disabled={isSyncingCloud}
                   className="inline-flex items-center gap-1.5 bg-emerald-500/30 hover:bg-emerald-500/50 text-emerald-100 text-[11px] font-bold px-2.5 py-1 rounded-md border border-emerald-400/40 cursor-pointer transition active:scale-95 disabled:opacity-60"
-                  title="Bấm để đồng bộ dữ liệu ngay lập tức với đám mây Firestore"
+                  title="Bấm để đồng bộ dữ liệu ngay lập tức với đám mây Supabase"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin' : ''}`} />
                   <span>{isSyncingCloud ? 'Đang đồng bộ...' : '☁️ CSDL Đám mây: Đồng bộ mọi máy'}</span>

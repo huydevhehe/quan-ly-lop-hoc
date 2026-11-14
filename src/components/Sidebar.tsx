@@ -485,7 +485,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               ></span>
               <div>
                 <div className="text-[11px] font-extrabold text-slate-800 leading-tight">
-                  {isSyncingCloud ? 'Đang đồng bộ...' : 'Đám mây Firestore'}
+                  {isSyncingCloud ? 'Đang đồng bộ...' : 'Đám mây Supabase'}
                 </div>
                 <div className="text-[9px] font-semibold text-emerald-700">
                   {isCloudConnected ? '● CSDL thống nhất mọi máy' : 'Đang kết nối...'}
