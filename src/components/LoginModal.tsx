@@ -179,13 +179,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           >
             Đăng nhập ngay
           </button>
-
-          <div className="pt-2 border-t border-slate-100">
-            <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-200 text-[11px] text-emerald-800 flex items-center gap-1.5 leading-snug">
-              <span>🔒</span>
-              <span><strong>CSDL độc lập:</strong> Mỗi tài khoản có danh sách lớp và học sinh riêng biệt, thêm hoặc xóa không ảnh hưởng đến tài khoản khác.</span>
-            </div>
-          </div>
         </form>
       </div>
     </div>
