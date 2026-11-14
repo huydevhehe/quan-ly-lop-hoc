@@ -40,6 +40,7 @@ import {
   parseQuestionsExcelFile,
   bulkInsertQuestions,
 } from '../services/quizService';
+import { QuizTopicActivationPanel } from './QuizTopicActivationPanel';
 
 interface QuizBankProps {
   quizzes: QuizQuestion[];
@@ -127,8 +128,12 @@ export const QuizBank: React.FC<QuizBankProps> = ({ quizzes, setQuizzes, isAdmin
   const [newCorrectIndex, setNewCorrectIndex] = useState(0);
   const [newExplanation, setNewExplanation] = useState('');
 
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+
   const filteredQuizzes = quizzes.filter(
-    (q) => selectedGrade === 'all' || q.grade === selectedGrade
+    (q) =>
+      (selectedGrade === 'all' || q.grade === selectedGrade) &&
+      (!selectedTopicId || q.topic === selectedTopicId)
   );
 
   const activeQuestion = filteredQuizzes[currentQuizIndex] || filteredQuizzes[0];
@@ -480,6 +485,13 @@ export const QuizBank: React.FC<QuizBankProps> = ({ quizzes, setQuizzes, isAdmin
               )}
             </div>
           </div>
+
+          {/* Panel Quản lý & Kích hoạt chủ đề */}
+          <QuizTopicActivationPanel
+            grade={selectedGrade}
+            selectedTopicId={selectedTopicId}
+            onSelectTopic={setSelectedTopicId}
+          />
 
           {/* Question Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
