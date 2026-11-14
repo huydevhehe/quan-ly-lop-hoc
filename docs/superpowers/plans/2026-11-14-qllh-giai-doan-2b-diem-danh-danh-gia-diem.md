@@ -143,15 +143,15 @@
 **Interfaces:**
 - Consumes: `scoresService` từ Task 2.
 
-- [ ] **Step 1: Đọc file, tìm mọi chỗ gọi `getSavedGrades`, `saveGradesPermanently`**
+- [x] **Step 1: Đọc file, tìm mọi chỗ gọi `getSavedGrades`, `saveGradesPermanently`**
 
-- [ ] **Step 2: Thay bằng gọi `scoresService.getClassScores`/`saveScore`**
+- [x] **Step 2: Thay bằng gọi `scoresService.getClassScores`/`saveScore`**
   Giữ nguyên UI hiện có (cột Lý thuyết/Thực hành/Tổng/Xếp loại, toggle Học kỳ 1/Cuối năm, nút Xuất Excel/Lưu điểm) — chỉ đổi nguồn dữ liệu, chưa thêm tính năng mới (bộ lọc/biểu đồ là Giai đoạn 3A).
 
-- [ ] **Step 3: Kiểm tra thủ công**
+- [x] **Step 3: Kiểm tra thủ công**
   Chạy `npm run dev`, nhập điểm vài học sinh, đổi học kỳ, F5 lại trang → điểm phải còn nguyên từ Supabase.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
   ```bash
   git add src/components/ReportsSection.tsx
   git commit -m "feat: wire scores table UI to scoresService"

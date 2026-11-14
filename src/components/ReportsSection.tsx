@@ -21,6 +21,7 @@ import {
   getSavedGrades,
   getSavedCurrentYear,
 } from '../utils/dbStorage';
+import { getClassScores, saveScore } from '../services/scoresService';
 
 interface ClassItem {
   id: string;
@@ -91,6 +92,30 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
   const [selectedTerm, setSelectedTerm] = useState<'hk1' | 'hk2'>('hk1');
   const [searchQuery, setSearchQuery] = useState('');
   const [showCommentsModal, setShowCommentsModal] = useState(false);
+
+  // Tải điểm từ Supabase scoresService khi chọn lớp
+  useEffect(() => {
+    if (selectedClassId === 'all') return;
+    const termKey: 'hk1' | 'ca_nam' = selectedTerm === 'hk1' ? 'hk1' : 'ca_nam';
+    getClassScores(selectedClassId, termKey)
+      .then((scores) => {
+        if (!scores || scores.length === 0) return;
+        setGradeData((prev) => {
+          const next = { ...prev };
+          for (const s of scores) {
+            const key = `${s.studentId}_${selectedTerm}`;
+            next[key] = {
+              lt: s.theoryScore !== null ? String(s.theoryScore) : '',
+              th: s.practiceScore !== null ? String(s.practiceScore) : '',
+              total: s.totalScore !== null ? String(s.totalScore) : '',
+              rank: s.classification || '',
+            };
+          }
+          return next;
+        });
+      })
+      .catch(() => {});
+  }, [selectedClassId, selectedTerm]);
 
   // Classes filtered by current year AND logged-in user
   const yearClasses = useMemo(() => {
