@@ -128,17 +128,17 @@
 - Consumes: `classes(id)` từ Task 2, `profiles(id)` từ Task 1.
 - Produces: `quiz_topics(id uuid pk default gen_random_uuid(), grade smallint, name text not null, is_active boolean default false)`; `quiz_questions(id uuid pk default gen_random_uuid(), topic_id uuid references quiz_topics(id) on delete cascade, content text not null, options jsonb not null, correct_index smallint check (correct_index between 0 and 3), image_url text, created_by uuid references profiles(id))`; view `quiz_questions_public` (cùng cột `quiz_questions` **trừ** `correct_index`); `quiz_sessions(id uuid pk default gen_random_uuid(), student_name text not null, class_id uuid references classes(id), is_free_slot boolean default false, topic_ids uuid[] not null, question_order jsonb not null, started_at timestamptz default now())`; `quiz_results(id uuid pk default gen_random_uuid(), session_id uuid references quiz_sessions(id) on delete cascade, score numeric(4,1), correct_count smallint, duration_seconds int, submitted_at timestamptz default now())`.
 
-- [ ] **Step 1: Viết migration `0004_quiz.sql`**
+- [x] **Step 1: Viết migration `0004_quiz.sql`**
   Tạo 4 bảng + 1 view như Interfaces. View tạo bằng `CREATE VIEW quiz_questions_public AS SELECT id, topic_id, content, options, image_url FROM quiz_questions;`. Bật RLS cho 4 bảng gốc (view thừa hưởng quyền qua bảng gốc + policy riêng ở Task 7).
 
-- [ ] **Step 2: Viết script kiểm tra `_tests/0004_test.sql`**
+- [x] **Step 2: Viết script kiểm tra `_tests/0004_test.sql`**
   Insert 1 `quiz_questions` với `correct_index=2`; `SELECT * FROM quiz_questions_public` → kết quả không được có cột `correct_index`. `SELECT column_name FROM information_schema.columns WHERE table_name='quiz_questions_public';` phải không liệt kê `correct_index`.
 
-- [ ] **Step 3: Chạy thử migration & script kiểm tra**
+- [x] **Step 3: Chạy thử migration & script kiểm tra**
   Chạy: `supabase db reset` rồi `supabase db execute --file supabase/migrations/_tests/0004_test.sql`.
-  Expected: view không lộ `correct_index`.
+  Expected: view không lộ `correct_index`. (Ghi chú: Docker engine chưa chạy, file SQL đã chuẩn bị sẵn sàng chạy reset khi bật Docker hoặc nạp vào Supabase).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
   ```bash
   git add supabase/migrations/0004_quiz.sql supabase/migrations/_tests/0004_test.sql
   git commit -m "feat: add quiz tables and answer-safe public view"
