@@ -79,7 +79,7 @@
   - `signOut(): Promise<void>`
   - `getCurrentSession(): Promise<{ role: 'admin' | 'teacher' | 'student' | null }>`
 
-- [ ] **Step 1: Viết test cho `signInStaff` sai mật khẩu**
+- [x] **Step 1: Viết test cho `signInStaff` sai mật khẩu**
   ```ts
   test('signInStaff tra loi khi sai mat khau', async () => {
     const result = await signInStaff('gv1@qllh.local', 'sai-mat-khau');
@@ -87,14 +87,14 @@
   });
   ```
 
-- [ ] **Step 2: Chạy test, xác nhận fail**
+- [x] **Step 2: Chạy test, xác nhận fail**
   Chạy: `npx vitest run src/services/__tests__/authService.test.ts -t "signInStaff tra loi"`.
   Expected: FAIL với "signInStaff is not defined".
 
-- [ ] **Step 3: Implement `signInStaff`**
+- [x] **Step 3: Implement `signInStaff`**
   Gọi `supabase.auth.signInWithPassword({ email, password })`. Nếu lỗi → trả `{ error: 'Sai email hoặc mật khẩu' }`. Nếu thành công → `select * from profiles where id = auth.uid()` lấy role/full_name, map sang `UserAccount` (điền `username: email`, bỏ trống `password`), trả `{ profile }`.
 
-- [ ] **Step 4: Viết test cho `signInStudentWithRoomCode` — mã phòng sai**
+- [x] **Step 4: Viết test cho `signInStudentWithRoomCode` — mã phòng sai**
   ```ts
   test('signInStudentWithRoomCode tra loi khi ma phong khong ton tai', async () => {
     const result = await signInStudentWithRoomCode('MA-KHONG-TON-TAI', 'Nguyen Van A');
@@ -102,14 +102,14 @@
   });
   ```
 
-- [ ] **Step 5: Chạy test, xác nhận fail rồi implement**
+- [x] **Step 5: Chạy test, xác nhận fail rồi implement**
   Implement `signInStudentWithRoomCode`: gọi `supabase.auth.signInAnonymously()` nếu chưa có session anon; `select id from classes where room_code = roomCode`; nếu không tìm thấy → `signOut()` session anon vừa tạo rồi trả `{ error: 'Mã phòng không đúng' }` (đúng Review Focus #2 — không được tạo `room_sessions` trỏ `class_id = null`); nếu tìm thấy → `insert into room_sessions (auth_uid, class_id) values (auth.uid(), classId)` rồi trả `{ classId }`.
 
-- [ ] **Step 6: Chạy lại toàn bộ test file**
+- [x] **Step 6: Chạy lại toàn bộ test file**
   Chạy: `npx vitest run src/services/__tests__/authService.test.ts`.
   Expected: PASS cả 2 test.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
   ```bash
   git add src/services/authService.ts src/services/__tests__/authService.test.ts
   git commit -m "feat: add authService for staff login and student room-code join"
