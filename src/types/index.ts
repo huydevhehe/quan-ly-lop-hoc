@@ -93,3 +93,14 @@ export interface QuizSubmission {
   }[];
 }
 
+
+
+export interface Resource {
+  id: string;
+  type: 'video' | 'link' | 'game';
+  grade?: number;
+  title: string;
+  url: string;
+  thumbnailUrl?: string;
+  isActive: boolean;
+}

@@ -70,23 +70,23 @@
   - `setResourceActive(id: string, isActive: boolean): Promise<void>`
   - `deleteResource(id: string): Promise<void>`
 
-- [ ] **Step 1: Viết test "url rỗng bị chặn" (Review Focus #4)**
+- [x] **Step 1: Viết test "url rỗng bị chặn" (Review Focus #4)**
   ```ts
   test('createResource bao loi khi url khong hop le', async () => {
     await expect(createResource({ type: 'game', title: 'Game test', url: '', isActive: false })).rejects.toThrow();
   });
   ```
 
-- [ ] **Step 2: Chạy test, xác nhận fail**
+- [x] **Step 2: Chạy test, xác nhận fail**
   Expected: FAIL vì `resourcesService` chưa tồn tại.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
   `createResource`: validate `url` khớp regex `^https?:\/\/`, nếu sai `throw new Error('URL không hợp lệ')` trước khi gọi Supabase. 3 hàm còn lại thao tác thẳng theo `id`/`type`.
 
-- [ ] **Step 4: Chạy lại test**
+- [x] **Step 4: Chạy lại test**
   Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
   ```bash
   git add src/services/resourcesService.ts src/services/__tests__/resourcesService.test.ts src/types/index.ts
   git commit -m "feat: add resourcesService for digital materials, games, utilities"
