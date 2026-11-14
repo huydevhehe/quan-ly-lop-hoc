@@ -120,15 +120,15 @@
 **Interfaces:**
 - Consumes: `quizService` từ Task 1; `examService.listActiveTopics`-tương đương cho phần xem kết quả (GV xem `quiz_results` join `quiz_sessions` — thêm hàm `quizService.listExamResults(classId?: string): Promise<QuizSubmission[]>` nếu `QuizBank.tsx` có màn hình này, dùng type `QuizSubmission` có sẵn).
 
-- [ ] **Step 1: Đọc file, tìm mọi chỗ đọc/ghi `localStorage.qllh_quiz_bank` và `qllh_quiz_submissions`, cùng lời gọi `syncQuizSubmissionToFirestore` (từ `firebase.ts`)**
+- [x] **Step 1: Đọc file, tìm mọi chỗ đọc/ghi `localStorage.qllh_quiz_bank` và `qllh_quiz_submissions`, cùng lời gọi `syncQuizSubmissionToFirestore` (từ `firebase.ts`)**
 
-- [ ] **Step 2: Thay bằng `quizService`/`examService`**
+- [x] **Step 2: Thay bằng `quizService`/`examService`**
   CRUD câu hỏi/chủ đề → `quizService`. Hiển thị bảng điểm học sinh thi (STT, họ tên, lớp, khối, điểm số, số câu đúng, xếp loại, thời gian, ngày nộp) → thêm `quizService.listExamResults` đọc `quiz_results` join `quiz_sessions`, giữ nguyên UI đã có.
 
-- [ ] **Step 3: Kiểm tra thủ công**
+- [x] **Step 3: Kiểm tra thủ công**
   `npm run dev`: thêm câu hỏi mới, xóa câu hỏi, bật/tắt chủ đề, xem số đếm "(n câu)" tự cập nhật đúng.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
   ```bash
   git add src/components/QuizBank.tsx
   git commit -m "feat: wire QuizBank UI to quizService/examService"

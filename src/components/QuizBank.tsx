@@ -29,6 +29,7 @@ import { QuizQuestion, QuizSubmission } from '../types';
 import { soundManager } from '../utils/audio';
 import { INITIAL_SUBMISSIONS } from '../data/mockData';
 import { pushAllDataToFirestore } from '../firebase';
+import { listTopics, listQuestionsByTopic, createQuestion, deleteQuestion, listExamResults } from '../services/quizService';
 
 interface QuizBankProps {
   quizzes: QuizQuestion[];
@@ -89,6 +90,17 @@ export const QuizBank: React.FC<QuizBankProps> = ({ quizzes, setQuizzes, isAdmin
     };
     window.addEventListener('qllh_data_updated', handleGlobalDataSync);
     return () => window.removeEventListener('qllh_data_updated', handleGlobalDataSync);
+  }, []);
+
+  // Tải kết quả thi học sinh từ Supabase quiz_results join quiz_sessions
+  useEffect(() => {
+    listExamResults()
+      .then((results) => {
+        if (results && results.length > 0) {
+          setSubmissions(results);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Scores filter state
