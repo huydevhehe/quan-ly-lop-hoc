@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabaseClient';
 import { QuizQuestion, QuizSubmission } from '../types';
 
@@ -8,6 +9,138 @@ export interface QuizTopicItem {
   isActive: boolean;
   questionCount: number;
 }
+
+export interface ParsedQuestionRow {
+  content: string;
+  options: string[];
+  correctIndex: number;
+}
+
+export type ParseQuestionsResult =
+  | { rows: ParsedQuestionRow[] }
+  | { error: string; lineNumber?: number };
+
+/**
+ * Validate và định dạng dữ liệu câu hỏi từ các dòng JSON parse từ Excel
+ */
+export function validateAndFormatQuestionRows(rawRows: any[]): ParseQuestionsResult {
+  if (!rawRows || rawRows.length === 0) {
+    return { error: 'File Excel không có dữ liệu câu hỏi.' };
+  }
+
+  const rows: ParsedQuestionRow[] = [];
+
+  for (let i = 0; i < rawRows.length; i++) {
+    const r = rawRows[i];
+    const lineNumber = i + 1;
+
+    const content = (r['Câu hỏi'] ?? r['cauHoi'] ?? r['Content'] ?? '').toString().trim();
+    const optA = (r['A'] ?? r['a'] ?? '').toString().trim();
+    const optB = (r['B'] ?? r['b'] ?? '').toString().trim();
+    const optC = (r['C'] ?? r['c'] ?? '').toString().trim();
+    const optD = (r['D'] ?? r['d'] ?? '').toString().trim();
+    const correctRaw = (r['Đáp án đúng'] ?? r['dapAnDung'] ?? r['Correct'] ?? '').toString().trim().toUpperCase();
+
+    if (!content) {
+      return { error: `Dòng ${lineNumber} thiếu nội dung câu hỏi`, lineNumber };
+    }
+
+    if (!optA || !optB || !optC || !optD) {
+      return { error: `Dòng ${lineNumber} thiếu một trong 4 đáp án (A, B, C, D)`, lineNumber };
+    }
+
+    const validLetters = ['A', 'B', 'C', 'D'];
+    const correctIndex = validLetters.indexOf(correctRaw);
+    if (correctIndex === -1) {
+      return { error: `Dòng ${lineNumber} đáp án đúng không hợp lệ (phải là A, B, C hoặc D)`, lineNumber };
+    }
+
+    rows.push({
+      content,
+      options: [optA, optB, optC, optD],
+      correctIndex,
+    });
+  }
+
+  return { rows };
+}
+
+/**
+ * Đọc file Excel câu hỏi và validate nội dung
+ */
+export async function parseQuestionsExcelFile(file: File): Promise<ParseQuestionsResult> {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const firstSheetName = workbook.SheetNames[0];
+    if (!firstSheetName) {
+      return { error: 'File Excel rỗng, không có trang tính nào.' };
+    }
+
+    const worksheet = workbook.Sheets[firstSheetName];
+    const rawRows = XLSX.utils.sheet_to_json<any>(worksheet);
+
+    return validateAndFormatQuestionRows(rawRows);
+  } catch (err: any) {
+    return { error: `Không thể đọc file Excel: ${err.message || 'Lỗi định dạng'}` };
+  }
+}
+
+/**
+ * Nhập câu hỏi hàng loạt vào một chủ đề (All-or-nothing: 1 lệnh insert nhiều dòng)
+ */
+export async function bulkInsertQuestions(
+  topicId: string,
+  rows: ParsedQuestionRow[]
+): Promise<void> {
+  if (!rows || rows.length === 0) return;
+
+  const records = rows.map((r) => ({
+    topic_id: topicId,
+    content: r.content,
+    options: r.options,
+    correct_index: r.correctIndex,
+  }));
+
+  const { error } = await supabase.from('quiz_questions').insert(records);
+  if (error) {
+    throw new Error(`Lỗi khi nhập câu hỏi hàng loạt: ${error.message}`);
+  }
+}
+
+/**
+ * Tạo file Excel mẫu chuẩn cho việc nhập câu hỏi trắc nghiệm
+ */
+export function generateSampleExcelTemplate(): Blob {
+  const sampleData = [
+    {
+      'Câu hỏi': 'Thủ đô của Việt Nam là gì?',
+      A: 'Hà Nội',
+      B: 'TP. Hồ Chí Minh',
+      C: 'Đà Nẵng',
+      D: 'Huế',
+      'Đáp án đúng': 'A',
+    },
+    {
+      'Câu hỏi': '1 + 1 bằng bao nhiêu?',
+      A: '1',
+      B: '2',
+      C: '3',
+      D: '4',
+      'Đáp án đúng': 'B',
+    },
+  ];
+
+  const worksheet = XLSX.utils.json_to_sheet(sampleData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'MauCauHoi');
+
+  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  return new Blob([excelBuffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+}
+
 
 /**
  * Lấy danh sách các chủ đề kèm số lượng câu hỏi thực tế trong từng chủ đề

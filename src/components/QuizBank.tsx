@@ -29,7 +29,17 @@ import { QuizQuestion, QuizSubmission } from '../types';
 import { soundManager } from '../utils/audio';
 import { INITIAL_SUBMISSIONS } from '../data/mockData';
 import { pushAllDataToFirestore } from '../firebase';
-import { listTopics, listQuestionsByTopic, createQuestion, deleteQuestion, listExamResults } from '../services/quizService';
+import {
+  listTopics,
+  listQuestionsByTopic,
+  createQuestion,
+  deleteQuestion,
+  listExamResults,
+  createTopic,
+  generateSampleExcelTemplate,
+  parseQuestionsExcelFile,
+  bulkInsertQuestions,
+} from '../services/quizService';
 
 interface QuizBankProps {
   quizzes: QuizQuestion[];
@@ -268,6 +278,44 @@ export const QuizBank: React.FC<QuizBankProps> = ({ quizzes, setQuizzes, isAdmin
   const goodRate =
     totalSubmissions > 0 ? Math.round((goodCount / totalSubmissions) * 100) : 0;
 
+  const handleDownloadSample = () => {
+    const blob = generateSampleExcelTemplate();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mau_cau_hoi_trac_nghiem.xlsx';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const parsed = await parseQuestionsExcelFile(file);
+      if ('error' in parsed) {
+        alert(parsed.error);
+        return;
+      }
+
+      const topicsList = await listTopics();
+      let targetTopicId = topicsList[0]?.id;
+      if (!targetTopicId) {
+        targetTopicId = await createTopic(selectedGrade === 'all' ? 1 : selectedGrade, 'Chủ đề chung');
+      }
+
+      await bulkInsertQuestions(targetTopicId, parsed.rows);
+      alert(`Nhập thành công ${parsed.rows.length} câu hỏi!`);
+      const updatedQs = await listQuestionsByTopic(targetTopicId);
+      setQuizzes((prev) => [...prev, ...updatedQs]);
+    } catch (err: any) {
+      alert(`Lỗi khi nhập Excel: ${err.message}`);
+    } finally {
+      e.target.value = '';
+    }
+  };
+
   // Export submissions to Excel
   const handleExportToExcel = () => {
     if (filteredSubmissions.length === 0) {
@@ -400,13 +448,35 @@ export const QuizBank: React.FC<QuizBankProps> = ({ quizzes, setQuizzes, isAdmin
               </button>
 
               {isAdmin && (
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Thêm câu hỏi mới</span>
-                </button>
+                <>
+                  <button
+                    onClick={handleDownloadSample}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    title="Tải file mẫu Excel câu hỏi trắc nghiệm"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                    <span>Tải file mẫu</span>
+                  </button>
+
+                  <label className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-colors cursor-pointer">
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span>Nhập file Excel</span>
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                      onChange={handleImportExcel}
+                    />
+                  </label>
+
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Thêm câu hỏi mới</span>
+                  </button>
+                </>
               )}
             </div>
           </div>

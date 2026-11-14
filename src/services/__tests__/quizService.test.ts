@@ -17,6 +17,7 @@ import {
   createQuestion,
   deleteQuestion,
   listExamResults,
+  validateAndFormatQuestionRows,
 } from '../quizService';
 
 describe('quizService', () => {
@@ -103,4 +104,31 @@ describe('quizService', () => {
 
     await expect(deleteQuestion('q1')).resolves.not.toThrow();
   });
+
+  it('parseQuestionsExcelFile bao loi dung so dong khi thieu dap an D', async () => {
+    const invalidRows = [
+      { 'Câu hỏi': 'Câu 1', A: '1', B: '2', C: '3', D: '4', 'Đáp án đúng': 'A' },
+      { 'Câu hỏi': 'Câu 2', A: '1', B: '2', C: '3', D: '', 'Đáp án đúng': 'B' }, // thieu D
+    ];
+
+    const result = validateAndFormatQuestionRows(invalidRows);
+    expect('error' in result).toBe(true);
+    if ('error' in result) {
+      expect(result.lineNumber).toBe(2);
+    }
+  });
+
+  it('parseQuestionsExcelFile thanh cong khi du 4 dap an va dap an dung hop le', async () => {
+    const validRows = [
+      { 'Câu hỏi': 'Câu 1', A: '1', B: '2', C: '3', D: '4', 'Đáp án đúng': 'C' },
+    ];
+
+    const result = validateAndFormatQuestionRows(validRows);
+    expect('rows' in result).toBe(true);
+    if ('rows' in result) {
+      expect(result.rows.length).toBe(1);
+      expect(result.rows[0].correctIndex).toBe(2);
+    }
+  });
 });
+
