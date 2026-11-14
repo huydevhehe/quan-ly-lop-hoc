@@ -199,25 +199,50 @@
 
 ---
 
+### Giai đoạn 3B: Trắc nghiệm Nâng cao & Chống Gian Lận
+Đã hoàn thành 4 Task nâng cấp hệ thống Trắc nghiệm:
+
+1. **Task 1: Upload ảnh câu hỏi trắc nghiệm qua Supabase Storage**
+   - Migration: `supabase/migrations/0011_quiz_questions_image_storage_policy.sql` tạo bucket `quiz-images` (public read, authenticated write).
+   - Service: `src/services/quizImageService.ts` validate kích thước (<= 2MB), định dạng (PNG/JPEG/WEBP) và upload tạo public URL.
+   - Unit test: `src/services/__tests__/quizImageService.test.ts` (PASS 3/3).
+
+2. **Task 2: Import câu hỏi hàng loạt từ file Excel**
+   - File: `src/services/quizService.ts` bổ sung `parseQuestionsExcelFile`, `validateAndFormatQuestionRows`, `bulkInsertQuestions` (all-or-nothing), `generateSampleExcelTemplate`.
+   - Nối nút "Tải file mẫu" và "Nhập file Excel" vào giao diện `src/components/QuizBank.tsx`.
+   - Unit test: `src/services/__tests__/quizService.test.ts` (PASS 7/7).
+
+3. **Task 3: Edge Functions Chấm điểm & Xáo trộn Server-side**
+   - Edge Function `supabase/functions/start-exam-session/index.ts`: Thuật toán Fisher-Yates xáo trộn thứ tự câu hỏi và thứ tự 4 đáp án (dùng `crypto.getRandomValues`), bảo mật giấu hoàn toàn `correct_index` ở phía server.
+   - Edge Function `supabase/functions/submit-exam-session/index.ts`: Tự động chấm điểm đối chiếu với map đáp án server-side, bảo đảm chống can thiệp từ client.
+   - `src/services/examService.ts` tích hợp gọi Edge Functions và cơ chế fallback linh hoạt.
+   - Unit test: `src/services/__tests__/examService.test.ts` (PASS 5/5).
+
+4. **Task 4: Màn hình Bật/Tắt và Quản lý Chủ đề thi**
+   - Component: `src/components/QuizTopicActivationPanel.tsx`: Quản lý danh sách chủ đề theo khối lớp, bật/tắt kích hoạt từng chủ đề hoặc toàn bộ chủ đề cùng lúc, thêm chủ đề mới tức thì.
+   - Tích hợp trực tiếp vào tab Ngân hàng câu hỏi của `src/components/QuizBank.tsx`.
+
+---
+
 ## 3. Kết quả kiểm thử & Chất lượng mã nguồn
 
-- **Unit Test (Vitest)**: Toàn bộ **42/42 test cases đều PASS**.
+- **Unit Test (Vitest)**: Toàn bộ **46/46 test cases đều PASS**.
   - `src/lib/__tests__/supabaseClient.test.ts`: 1 passed.
   - `src/services/__tests__/authService.test.ts`: 4 passed.
   - `src/services/__tests__/classesService.test.ts`: 4 passed.
   - `src/services/__tests__/studentsService.test.ts`: 4 passed.
   - `src/services/__tests__/attendanceService.test.ts`: 4 passed.
   - `src/services/__tests__/scoresService.test.ts`: 5 passed.
-  - `src/services/__tests__/quizService.test.ts`: 5 passed.
-  - `src/services/__tests__/examService.test.ts`: 4 passed.
+  - `src/services/__tests__/quizService.test.ts`: 7 passed.
+  - `src/services/__tests__/examService.test.ts`: 5 passed.
   - `src/services/__tests__/resourcesService.test.ts`: 5 passed.
   - `src/services/__tests__/adminService.test.ts`: 4 passed.
   - `src/services/__tests__/excelExportService.test.ts`: 2 passed.
+  - `src/services/__tests__/quizImageService.test.ts`: 3 passed.
 - **TypeScript Static Analysis (`tsc --noEmit`)**: **0 Lỗi** (Không có cảnh báo hay lỗi kiểu dữ liệu).
 
 ---
 
 ## 4. Kế hoạch các bước tiếp theo
-- **Giai đoạn 2B**: Chuyển đổi module Điểm danh (`attendance`) và Nhận xét tuần (`weekly_evaluations`) sang Supabase.
-- **Giai đoạn 2C**: Chuyển đổi module Bảng điểm & Báo cáo thống kê (`scores`) sang Supabase.
-- **Giai đoạn 2D**: Chuyển đổi Ngân hàng đề thi trắc nghiệm (`quiz_questions`, `quiz_sessions`, `quiz_results`) và Edge Functions xáo trộn/chấm điểm server-side.
+- **Giai đoạn 3C**: Mở rộng Học liệu số & Game Giải trí mới (`2026-11-14-qllh-giai-doan-3c-hoc-lieu-giai-tri-moi.md`).
+- **Giai đoạn 2E**: Dọn dẹp code Firebase cũ (`2026-11-14-qllh-giai-doan-2e-don-dep-code-cu.md`).
