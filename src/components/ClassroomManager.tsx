@@ -33,36 +33,8 @@ import {
   getWeekEvaluations,
   saveWeekEvaluation,
 } from '../services/attendanceService';
-import {
-  pushAllDataToFirestore,
-  deleteClassFromFirestore,
-  deleteStudentFromFirestore,
-  deleteAllStudentsOfClassFromFirestore,
-  deleteYearFromFirestore,
-} from '../firebase';
+import { getClassScores, saveScore } from '../services/scoresService';
 import { RandomPickerModal } from './RandomPickerModal';
-import { isClassVisibleForUser, filterClassesForUser, getUserScopeId } from '../utils/userScope';
-import {
-  getSavedClasses,
-  getSavedStudents,
-  getSavedGrades,
-  getSavedWeeks,
-  getSavedEvals,
-  getSavedTimetable,
-  getSavedYears,
-  getSavedCurrentYear,
-  saveClassesPermanently,
-  saveStudentsPermanently,
-  saveGradesPermanently,
-  saveWeeksPermanently,
-  saveEvalsPermanently,
-  saveTimetablePermanently,
-  saveYearsPermanently,
-  saveCurrentYearPermanently,
-  updateVault,
-  debounceCloudSync,
-  unmarkClassAsDeleted,
-} from '../utils/dbStorage';
 
 export interface ClassItem {
   id: string;
@@ -136,56 +108,81 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   const isRealAdmin = Boolean(isAdmin || currentUser?.role === 'admin');
   const canManage = Boolean(isRealAdmin || currentUser?.role === 'teacher');
   // Years state theo tài khoản
-  const [yearsData, setYearsData] = useState<string[]>(() => getSavedYears(currentUser));
-  const [currentYear, setCurrentYear] = useState<string>(() => getSavedCurrentYear(currentUser));
+  const [yearsData, setYearsData] = useState<string[]>(['2025-2026', '2024-2025']);
+  const [currentYear, setCurrentYear] = useState<string>('2025-2026');
 
-  // Classes state (sử dụng getSavedClasses theo tài khoản đăng nhập)
-  const [classesData, setClassesData] = useState<ClassItem[]>(() => getSavedClasses(currentUser));
+  // Classes state (sử dụng Supabase classesService)
+  const [classesData, setClassesData] = useState<ClassItem[]>([]);
 
-  // Students state (sử dụng getSavedStudents theo tài khoản đăng nhập)
-  const [studentsData, setStudentsData] = useState<StudentRecord[]>(() => getSavedStudents(currentUser));
+  // Students state (sử dụng Supabase studentsService)
+  const [studentsData, setStudentsData] = useState<StudentRecord[]>([]);
 
-  // Weeks data (dates for each class + week number) theo tài khoản
-  const [weeksData, setWeeksData] = useState<Record<string, WeekDateRecord>>(() => getSavedWeeks(currentUser));
+  // Weeks data (dates for each class + week number)
+  const [weeksData, setWeeksData] = useState<Record<string, WeekDateRecord>>({});
 
-  // Evaluation data theo tài khoản
-  const [evalData, setEvalData] = useState<Record<string, EvalRecord>>(() => getSavedEvals(currentUser));
+  // Evaluation data
+  const [evalData, setEvalData] = useState<Record<string, EvalRecord>>({});
 
-  // Grades data theo tài khoản
-  const [gradeData, setGradeData] = useState<Record<string, GradeRecord>>(() => getSavedGrades(currentUser));
+  // Grades data
+  const [gradeData, setGradeData] = useState<Record<string, GradeRecord>>({});
 
-  // Timetable state theo tài khoản
-  const [timetable, setTimetable] = useState<string[][]>(() => getSavedTimetable(currentUser));
+  // Timetable state
+  const [timetable, setTimetable] = useState<string[][]>(() =>
+    Array(10).fill(null).map(() => Array(5).fill(''))
+  );
 
-  // Tự động chuyển đổi toàn bộ cơ sở dữ liệu khi đổi tài khoản (Admin <-> Giáo viên)
-  useEffect(() => {
-    const scope = getUserScopeId(currentUser);
-    const cls = getSavedClasses(scope);
-    setClassesData(cls);
-    const std = getSavedStudents(scope);
-    setStudentsData(std);
-    const grd = getSavedGrades(scope);
-    setGradeData(grd);
-    const wks = getSavedWeeks(scope);
-    setWeeksData(wks);
-    const evl = getSavedEvals(scope);
-    setEvalData(evl);
-    const yrs = getSavedYears(scope);
-    setYearsData(yrs);
-    const cy = getSavedCurrentYear(scope);
-    setCurrentYear(cy);
-    setTimetable(getSavedTimetable(scope));
-
-    // Reset selection
-    if (cls.length > 0) {
-      setCurrentClassId(cls[0].id);
-      if (onSelectClassExternal) onSelectClassExternal(cls[0].id);
-    } else {
-      setCurrentClassId('');
-      if (onSelectClassExternal) onSelectClassExternal('');
-      setCurrentView('list');
+  const fetchClasses = async () => {
+    try {
+      const res = await listMyClasses();
+      const mapped: ClassItem[] = res.map((c) => ({
+        id: c.id,
+        year: c.academicYear || '2025-2026',
+        name: c.name,
+        grade: `Khối ${c.grade}`,
+        bg: 'bg-emerald-500',
+        createdBy: currentUser?.id,
+        createdByName: currentUser?.fullName || 'Giáo viên',
+      }));
+      setClassesData(mapped);
+      if (mapped.length > 0) {
+        if (!currentClassId) {
+          setCurrentClassId(mapped[0].id);
+          if (onSelectClassExternal) onSelectClassExternal(mapped[0].id);
+        }
+      } else {
+        setCurrentClassId('');
+        if (onSelectClassExternal) onSelectClassExternal('');
+      }
+    } catch (err) {
+      console.error('Lỗi tải danh sách lớp:', err);
     }
-  }, [currentUser?.id, currentUser?.username]);
+  };
+
+  const fetchStudents = async (classId: string) => {
+    if (!classId) {
+      setStudentsData([]);
+      return;
+    }
+    try {
+      const res = await listStudentsByClass(classId);
+      const mapped: StudentRecord[] = res.map((s, idx) => ({
+        id: s.id,
+        classId: s.classId,
+        code: s.code,
+        name: s.name,
+        dob: s.dob,
+        gender: s.gender,
+        note: s.notes,
+        attendance: s.attendance,
+        stars: s.stars,
+        speeches: s.speeches,
+        orderIndex: idx + 1,
+      }));
+      setStudentsData(mapped);
+    } catch (err) {
+      console.error('Lỗi tải học sinh:', err);
+    }
+  };
 
   // Current view and selection
   const [currentView, setCurrentView] = useState<'list' | 'detail'>('list');
@@ -193,6 +190,73 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   const [subTab, setSubTab] = useState<'week' | 'student' | 'grade'>('week');
   const [currentWeek, setCurrentWeek] = useState<number>(9);
   const [currentTerm, setCurrentTerm] = useState<'hk1' | 'hk2'>('hk1');
+
+  useEffect(() => {
+    fetchClasses();
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (currentClassId) {
+      fetchStudents(currentClassId);
+    } else {
+      setStudentsData([]);
+    }
+  }, [currentClassId]);
+
+  useEffect(() => {
+    if (currentClassId) {
+      const termParam = currentTerm === 'hk1' ? 'hk1' : 'ca_nam';
+      getClassScores(currentClassId, termParam)
+        .then((scores) => {
+          const map: Record<string, GradeRecord> = {};
+          scores.forEach((sc) => {
+            const key = `${sc.studentId}_${currentTerm}`;
+            map[key] = {
+              lt: sc.theoryScore !== null ? String(sc.theoryScore) : '',
+              th: sc.practiceScore !== null ? String(sc.practiceScore) : '',
+              total: sc.totalScore !== null ? String(sc.totalScore) : '',
+              rank: sc.classification || '',
+            };
+          });
+          setGradeData(map);
+        })
+        .catch(() => {});
+    }
+  }, [currentClassId, currentTerm]);
+
+  useEffect(() => {
+    if (currentClassId && currentWeek) {
+      Promise.all([
+        getWeekAttendance(currentClassId, currentWeek),
+        getWeekEvaluations(currentClassId, currentWeek),
+      ])
+        .then(([attList, evalList]) => {
+          const map: Record<string, EvalRecord> = {};
+          Object.entries(attList).forEach(([stId, a]) => {
+            const key = `${stId}_${currentWeek}`;
+            map[key] = {
+              status: a.status === 'present' ? 'Có mặt' : a.status === 'unexcused' || a.status === 'excused' ? 'Vắng' : 'Để trống',
+              rank: '',
+              note: a.note || '',
+            };
+          });
+          Object.entries(evalList).forEach(([stId, comment]) => {
+            const key = `${stId}_${currentWeek}`;
+            if (map[key]) {
+              map[key].note = comment;
+            } else {
+              map[key] = {
+                status: 'Để trống',
+                rank: '',
+                note: comment,
+              };
+            }
+          });
+          setEvalData(map);
+        })
+        .catch(() => {});
+    }
+  }, [currentClassId, currentWeek]);
 
   // Eval subtab state
   const [evalStudentSearch, setEvalStudentSearch] = useState('');
@@ -253,80 +317,18 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   // Random picker modal state
   const [isLocalRandomPickerOpen, setIsLocalRandomPickerOpen] = useState(false);
 
-  // Sync state to local storage theo từng tài khoản
-  useEffect(() => {
-    saveYearsPermanently(yearsData, currentUser);
-  }, [yearsData, currentUser?.id]);
-
-  useEffect(() => {
-    saveCurrentYearPermanently(currentYear, currentUser);
-  }, [currentYear, currentUser?.id]);
-
-  useEffect(() => {
-    saveClassesPermanently(classesData, currentUser);
-  }, [classesData, currentUser?.id]);
-
-  useEffect(() => {
-    saveStudentsPermanently(studentsData, currentUser);
-  }, [studentsData, currentUser?.id]);
-
-  useEffect(() => {
-    saveGradesPermanently(gradeData, currentUser);
-  }, [gradeData, currentUser?.id]);
-
-  useEffect(() => {
-    saveWeeksPermanently(weeksData, currentUser);
-  }, [weeksData, currentUser?.id]);
-
-  useEffect(() => {
-    saveEvalsPermanently(evalData, currentUser);
-  }, [evalData, currentUser?.id]);
-
-  useEffect(() => {
-    saveTimetablePermanently(timetable, currentUser);
-  }, [timetable, currentUser?.id]);
-
-  // Lắng nghe sự kiện khôi phục dữ liệu để cập nhật tức thì
+  // Lắng nghe sự kiện dữ liệu cập nhật
   useEffect(() => {
     const handleGlobalSync = (e: Event) => {
-      // Tránh đọc đè localStorage nếu sự kiện do chính ClassroomManager kích hoạt
       if ((e as CustomEvent)?.detail?.source === 'ClassroomManager') return;
-      const cls = getSavedClasses(currentUser);
-      if (cls) {
-        setClassesData((prev) => (JSON.stringify(prev) === JSON.stringify(cls) ? prev : cls));
-      }
-      const std = getSavedStudents(currentUser);
-      if (std) {
-        setStudentsData((prev) => (JSON.stringify(prev) === JSON.stringify(std) ? prev : std));
-      }
-      const grd = getSavedGrades(currentUser);
-      if (grd) {
-        setGradeData((prev) => (JSON.stringify(prev) === JSON.stringify(grd) ? prev : grd));
-      }
-      const yrs = getSavedYears(currentUser);
-      if (yrs) {
-        setYearsData((prev) => (JSON.stringify(prev) === JSON.stringify(yrs) ? prev : yrs));
-      }
-      const cy = getSavedCurrentYear(currentUser);
-      if (cy) {
-        setCurrentYear(cy);
-      }
-      const wks = getSavedWeeks(currentUser);
-      if (wks) {
-        setWeeksData((prev) => (JSON.stringify(prev) === JSON.stringify(wks) ? prev : wks));
-      }
-      const evl = getSavedEvals(currentUser);
-      if (evl) {
-        setEvalData((prev) => (JSON.stringify(prev) === JSON.stringify(evl) ? prev : evl));
-      }
-      const tt = getSavedTimetable(currentUser);
-      if (tt) {
-        setTimetable((prev) => (JSON.stringify(prev) === JSON.stringify(tt) ? prev : tt));
+      fetchClasses();
+      if (currentClassId) {
+        fetchStudents(currentClassId);
       }
     };
     window.addEventListener('qllh_data_updated', handleGlobalSync);
     return () => window.removeEventListener('qllh_data_updated', handleGlobalSync);
-  }, [currentUser?.id]);
+  }, [currentClassId]);
 
   // Handle external selection
   useEffect(() => {
@@ -468,8 +470,8 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
 
   // Lọc chỉ các lớp thuộc về tài khoản người dùng đang đăng nhập
   const visibleClasses = useMemo(() => {
-    return normalizedClasses.filter((c: ClassItem) => isClassVisibleForUser(c, currentUser, adminViewAll));
-  }, [normalizedClasses, currentUser, adminViewAll]);
+    return normalizedClasses;
+  }, [normalizedClasses]);
 
   // Lớp theo năm học đang chọn (tự động khử trùng lặp theo tên lớp)
   const visibleClassesInCurrentYear = useMemo(() => {
@@ -535,19 +537,6 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     return studentsData.filter((s: StudentRecord) => s.classId === currentClass.id);
   }, [studentsData, currentClass]);
 
-  // Tự động khôi phục các học sinh từng bị mất mã lớp (classId rỗng) vào lớp đang hiển thị
-  useEffect(() => {
-    if (!currentClass?.id) return;
-    const orphans = studentsData.filter((s) => !s.classId || s.classId === '');
-    if (orphans.length > 0) {
-      const fixed = studentsData.map((s) =>
-        !s.classId || s.classId === '' ? { ...s, classId: currentClass.id } : s
-      );
-      setStudentsData(fixed);
-      saveStudentsPermanently(fixed, currentUser);
-    }
-  }, [currentClass?.id, studentsData]);
-
   // Danh sách học sinh phục vụ cho RandomPickerModal
   const pickerStudents: Student[] = classStudents.map((s: StudentRecord, idx: number) => ({
     id: s.id,
@@ -567,7 +556,6 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       prev.map((s) => (s.id === studentId ? { ...s, stars: (s.stars || 0) + 1 } : s))
     );
     window.dispatchEvent(new Event('qllh_data_updated'));
-    pushAllDataToFirestore(getUserScopeId(currentUser)).catch(() => {});
   };
 
   // Sorted students list for Student SubTab
@@ -668,7 +656,6 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       saveWeekEvaluation(selectedEvalStudentId, currentWeek, evalCustomText.trim()).catch(() => {});
     }
 
-    pushAllDataToFirestore(getUserScopeId(currentUser)).catch(() => {});
     setTimeout(() => setSaveEvalSuccess(false), 1500);
   };
 
@@ -702,7 +689,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     setShowClassModal(true);
   };
 
-  const handleSubmitClass = (e: React.FormEvent) => {
+  const handleSubmitClass = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = classFormName.trim().toUpperCase();
     const gradeVal = classFormGrade.trim();
@@ -711,67 +698,41 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       return;
     }
 
-    let bgClass = 'bg-gray-50';
-    if (gradeVal === '1' || gradeVal === '2') bgClass = 'bg-indigo-50 border-indigo-200';
-    else if (gradeVal === '3') bgClass = 'bg-amber-50 border-amber-200';
-    else if (gradeVal === '4' || gradeVal === '5') bgClass = 'bg-teal-50 border-teal-200';
-    else bgClass = 'bg-blue-50 border-blue-200';
-
-    const targetYear = classFormYear || currentYear;
-
     if (isEditingClass && (editingClassId || currentClassId)) {
       const targetId = (editingClassId || currentClassId)!;
-      const updatedList = classesData.map((c) =>
-        c.id === targetId
-          ? { ...c, name, grade: `Khối ${gradeVal}`, year: targetYear, bg: bgClass }
-          : c
-      );
-      setClassesData(updatedList);
-      saveClassesPermanently(updatedList, currentUser);
-    } else {
-      // Đảm bảo thông tin người tạo luôn gắn đúng với tài khoản giáo viên đang đăng nhập
-      const creatorId = getUserScopeId(currentUser);
-      const creatorName = currentUser?.fullName || currentUser?.username || 'Giáo viên';
-
-      const normName = name.trim().toLowerCase();
-      const normYear = targetYear.trim();
-      const logicKey = `${normName}__${normYear}`;
-
-      const newClass: ClassItem = {
-        id: `c_${Date.now()}`,
-        year: targetYear,
-        name,
-        grade: `Khối ${gradeVal}`,
-        bg: bgClass,
-        createdBy: creatorId,
-        createdByName: creatorName,
-      };
-
-      unmarkClassAsDeleted(newClass.id, logicKey);
-
-      const updatedList = [...classesData, newClass];
-      setClassesData(updatedList);
-      saveClassesPermanently(updatedList, currentUser);
-      setCurrentClassId(newClass.id);
-      if (onSelectClassExternal) onSelectClassExternal(newClass.id);
-
-      // Nếu năm học của lớp khác với năm học đang xem, tự động đồng bộ sang năm học đó
-      if (targetYear !== currentYear) {
-        setCurrentYear(targetYear);
-        saveCurrentYearPermanently(targetYear, currentUser);
-      }
-
       try {
-        confetti({ particleCount: 40, spread: 70, origin: { y: 0.6 } });
-      } catch {}
+        await updateClass(targetId, {
+          name,
+          grade: Number(gradeVal),
+        });
+        await fetchClasses();
+      } catch (err: any) {
+        alert(`Lỗi khi sửa lớp học: ${err.message}`);
+        return;
+      }
+    } else {
+      try {
+        const newClass = await createClass({
+          name,
+          grade: Number(gradeVal),
+        });
+        await fetchClasses();
+        setCurrentClassId(newClass.id);
+        if (onSelectClassExternal) onSelectClassExternal(newClass.id);
+        try {
+          confetti({ particleCount: 40, spread: 70, origin: { y: 0.6 } });
+        } catch {}
+      } catch (err: any) {
+        alert(`Lỗi khi tạo lớp học: ${err.message}`);
+        return;
+      }
     }
     setShowClassModal(false);
     window.dispatchEvent(new Event('qllh_data_updated'));
-    pushAllDataToFirestore(getUserScopeId(currentUser)).catch(() => {});
   };
 
-  // Action: Delete Class (Xóa triệt để cả local lẫn Firestore, không bao giờ bị phục hồi khi F5)
-  const handleDeleteClass = (clsId?: string) => {
+  // Action: Delete Class
+  const handleDeleteClass = async (clsId?: string) => {
     const targetId = clsId || currentClassId;
     if (!targetId) return;
     const cls = classesData.find((c) => c.id === targetId);
@@ -788,21 +749,18 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     );
     if (!confirmed) return;
 
-    const nextClasses = classesData.filter((c) => c.id !== targetId);
-    setClassesData(nextClasses);
-    saveClassesPermanently(nextClasses, currentUser);
-    const nextStudents = studentsData.filter((s) => s.classId !== targetId);
-    setStudentsData(nextStudents);
-    saveStudentsPermanently(nextStudents, currentUser);
-
-    if (currentClassId === targetId) {
-      setCurrentClassId('');
-      if (onSelectClassExternal) onSelectClassExternal('');
-      setCurrentView('list');
+    try {
+      await deleteClass(targetId);
+      await fetchClasses();
+      if (currentClassId === targetId) {
+        setCurrentClassId('');
+        if (onSelectClassExternal) onSelectClassExternal('');
+        setCurrentView('list');
+      }
+      window.dispatchEvent(new Event('qllh_data_updated'));
+    } catch (err: any) {
+      alert(`Lỗi khi xóa lớp: ${err.message}`);
     }
-    // Ghi nhận lệnh xóa vĩnh viễn lên Firestore và local tombstones
-    deleteClassFromFirestore(targetId, cls.name, cls.year, getUserScopeId(currentUser)).catch(() => {});
-    window.dispatchEvent(new Event('qllh_data_updated'));
   };
 
   // Action: Add / Edit Student Modal
@@ -830,79 +788,57 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     setShowStudentModal(true);
   };
 
-  const handleSubmitStudent = (e: React.FormEvent) => {
+  const handleSubmitStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentFormName.trim() || !studentFormCode.trim()) {
       alert('Vui lòng điền đủ Họ tên và Mã học sinh!');
       return;
     }
 
-    if (editingStudentId) {
-      const targetClassId = currentClass?.id || currentClassId;
-      const updated = studentsData.map((s) =>
-        s.id === editingStudentId
-          ? {
-              ...s,
-              name: studentFormName.trim(),
-              code: studentFormCode.trim(),
-              dob: studentFormDob,
-              gender: studentFormGender,
-              note: studentFormNote,
-            }
-          : s
-      );
-      setStudentsData(updated);
-      saveStudentsPermanently(updated, currentUser);
-      window.dispatchEvent(new CustomEvent('qllh_data_updated', { detail: { source: 'ClassroomManager' } }));
-      if (selectedEvalStudentId === editingStudentId) {
-        setEvalStudentSearch(`${studentFormName.trim()} (${studentFormCode.trim()})`);
-      }
-    } else {
-      const targetClassId = currentClass?.id || currentClassId;
-      const newSt: StudentRecord = {
-        id: `s_${Date.now()}`,
-        classId: targetClassId,
-        code: studentFormCode.trim(),
-        name: studentFormName.trim(),
-        dob: studentFormDob,
-        gender: studentFormGender,
-        note: studentFormNote,
-        attendance: 'present',
-        stars: 0,
-        speeches: 0,
-        orderIndex: classStudents.length + 1,
-      };
-      const updated = [...studentsData, newSt];
-      setStudentsData(updated);
-      saveStudentsPermanently(updated, currentUser);
-      window.dispatchEvent(new CustomEvent('qllh_data_updated', { detail: { source: 'ClassroomManager' } }));
-      if (!selectedEvalStudentId) {
-        setSelectedEvalStudentId(newSt.id);
-        setEvalStudentSearch(`${newSt.name} (${newSt.code})`);
-      }
+    const targetClassId = currentClass?.id || currentClassId;
+    if (!targetClassId) {
+      alert('Chưa có lớp học được chọn!');
+      return;
     }
-    setShowStudentModal(false);
-    pushAllDataToFirestore(getUserScopeId(currentUser)).catch(() => {});
+
+    try {
+      await upsertStudents(targetClassId, [
+        {
+          code: studentFormCode.trim(),
+          name: studentFormName.trim(),
+          gender: (studentFormGender as 'Nam' | 'Nữ') || 'Nam',
+          dob: studentFormDob || '2016-01-01',
+        },
+      ]);
+      await fetchStudents(targetClassId);
+      setShowStudentModal(false);
+      window.dispatchEvent(new CustomEvent('qllh_data_updated', { detail: { source: 'ClassroomManager' } }));
+    } catch (err: any) {
+      alert(`Lỗi khi lưu học sinh: ${err.message}`);
+    }
   };
 
   // Action: Delete Single Student
-  const handleDeleteStudent = (stId: string) => {
+  const handleDeleteStudent = async (stId: string) => {
     if (confirm('Thầy/Cô có chắc chắn muốn xóa học sinh này khỏi lớp?')) {
-      const updated = studentsData.filter((s) => s.id !== stId);
-      setStudentsData(updated);
-      saveStudentsPermanently(updated, currentUser);
-      if (selectedEvalStudentId === stId) {
-        setSelectedEvalStudentId('');
-        setEvalStudentSearch('');
+      try {
+        await deleteStudent(stId);
+        if (currentClassId) {
+          await fetchStudents(currentClassId);
+        }
+        if (selectedEvalStudentId === stId) {
+          setSelectedEvalStudentId('');
+          setEvalStudentSearch('');
+        }
+        window.dispatchEvent(new CustomEvent('qllh_data_updated', { detail: { source: 'ClassroomManager' } }));
+      } catch (err: any) {
+        alert(`Lỗi khi xóa học sinh: ${err.message}`);
       }
-      deleteStudentFromFirestore(stId).catch(() => {});
-      window.dispatchEvent(new CustomEvent('qllh_data_updated', { detail: { source: 'ClassroomManager' } }));
-      pushAllDataToFirestore(getUserScopeId(currentUser)).catch(() => {});
     }
   };
 
   // Action: Delete All Students in current class
-  const handleDeleteAllStudentsInClass = () => {
+  const handleDeleteAllStudentsInClass = async () => {
     if (classStudents.length === 0) {
       alert('Lớp chưa có học sinh nào để xóa!');
       return;
@@ -910,23 +846,37 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     const targetClass = currentClass || visibleClassesInCurrentYear.find((c) => c.id === currentClassId);
     const targetClassId = targetClass?.id || currentClassId;
     if (confirm(`Bạn chắc chắn muốn xóa TOÀN BỘ ${classStudents.length} học sinh của lớp ${targetClass?.name || ''}?`)) {
-      const updated = studentsData.filter((s) => s.classId !== targetClassId);
-      setStudentsData(updated);
-      saveStudentsPermanently(updated, currentUser);
-      setSelectedEvalStudentId('');
-      setEvalStudentSearch('');
-      deleteAllStudentsOfClassFromFirestore(targetClassId).catch(() => {});
-      window.dispatchEvent(new CustomEvent('qllh_data_updated', { detail: { source: 'ClassroomManager' } }));
-      pushAllDataToFirestore(getUserScopeId(currentUser)).catch(() => {});
+      try {
+        await Promise.all(classStudents.map((s) => deleteStudent(s.id)));
+        if (targetClassId) {
+          await fetchStudents(targetClassId);
+        }
+        setSelectedEvalStudentId('');
+        setEvalStudentSearch('');
+        window.dispatchEvent(new CustomEvent('qllh_data_updated', { detail: { source: 'ClassroomManager' } }));
+      } catch (err: any) {
+        alert(`Lỗi khi xóa học sinh: ${err.message}`);
+      }
     }
   };
 
   // Action: Update Student Field inline
   const handleUpdateStudentInline = (stId: string, field: keyof StudentRecord, val: string) => {
     if (!canManage) return;
+    const target = studentsData.find((s) => s.id === stId);
+    if (!target) return;
     const updated = studentsData.map((s) => (s.id === stId ? { ...s, [field]: val } : s));
     setStudentsData(updated);
-    saveStudentsPermanently(updated, currentUser);
+    if (currentClassId) {
+      upsertStudents(currentClassId, [
+        {
+          code: field === 'code' ? val : target.code,
+          name: field === 'name' ? val : target.name,
+          dob: field === 'dob' ? val : target.dob,
+          gender: field === 'gender' ? val : target.gender,
+        },
+      ]).catch(() => {});
+    }
   };
 
   // Action: Grade change handler
@@ -950,10 +900,8 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
 
       if (!isNaN(ltNum) || !isNaN(thNum)) {
         const rawSum = (!isNaN(ltNum) ? ltNum : 0) + (!isNaN(thNum) ? thNum : 0);
-        // Làm tròn cột tổng (ví dụ 7.5 sẽ thành 8)
         const roundedTotal = Math.round(rawSum);
         updated.total = roundedTotal.toString();
-        // Nếu điểm tổng từ 9, 10 thì T, ngược lại H
         updated.rank = roundedTotal >= 9 ? 'T' : 'H';
       } else {
         updated.total = '';
@@ -961,22 +909,24 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       }
     }
 
-    setGradeData((prev) => {
-      const next = {
-        ...prev,
-        [key]: updated,
-        ...(keyCode ? { [keyCode]: updated } : {}),
-      };
-      // Lưu vĩnh viễn và đồng bộ ngay lập tức để không bị mất khi sao lưu
-      saveGradesPermanently(next);
-      return next;
-    });
+    setGradeData((prev) => ({
+      ...prev,
+      [key]: updated,
+      ...(keyCode ? { [keyCode]: updated } : {}),
+    }));
+
+    if (stId) {
+      const ltNum = ltStr !== '' ? parseFloat(ltStr) : null;
+      const thNum = thStr !== '' ? parseFloat(thStr) : null;
+      if (ltNum !== null && thNum !== null && !isNaN(ltNum) && !isNaN(thNum)) {
+        const semParam = currentTerm === 'hk1' ? 'hk1' : 'ca_nam';
+        saveScore(stId, semParam, ltNum, thNum).catch(() => {});
+      }
+    }
   };
 
   const handleSaveAllGrades = () => {
-    saveGradesPermanently(gradeData);
     setSaveGradeSuccess(true);
-    pushAllDataToFirestore(getUserScopeId(currentUser)).catch(() => {});
     setTimeout(() => setSaveGradeSuccess(false), 1500);
   };
 
@@ -1079,7 +1029,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     }
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const buffer = evt.target?.result;
         if (!buffer) {
@@ -1299,35 +1249,33 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
           return s;
         });
 
-        const updatedStudents = [...cleanedExisting, ...newStudents];
-
         // 1. Cập nhật state
-        setStudentsData(updatedStudents);
         setStudentSortType('default');
         setGradeSortType('default');
         setCurrentView('detail');
         setSubTab('student');
-
-        // 2. Đồng bộ currentClassId nếu cần
         setCurrentClassId(targetClassId);
         if (onSelectClassExternal) onSelectClassExternal(targetClassId);
 
-        // 3. Tự động chọn học sinh đầu tiên cho phần đánh giá nếu chưa có
-        if (!selectedEvalStudentId && newStudents.length > 0) {
-          setSelectedEvalStudentId(newStudents[0].id);
-          setEvalStudentSearch(`${newStudents[0].name} (${newStudents[0].code})`);
-        }
+        // 2. Lưu vào Supabase qua studentsService.upsertStudents
+        await upsertStudents(
+          targetClassId,
+          newStudents.map((s) => ({
+            code: s.code,
+            name: s.name,
+            gender: (s.gender as 'Nam' | 'Nữ') || 'Nam',
+            dob: s.dob || '2016-01-01',
+            notes: s.note,
+          }))
+        );
+        await fetchStudents(targetClassId);
 
-        // 4. LƯU NGAY LẬP TỨC VÀO LOCALSTORAGE TRƯỚC KHI BẮN EVENT
-        saveStudentsPermanently(updatedStudents, currentUser);
-
-        // 5. Đóng modal và thông báo thành công
+        // 3. Đóng modal và thông báo thành công
         setShowImportExcelModal(false);
         alert(`✅ Đã nhập thành công ${newStudents.length} học sinh vào lớp ${targetClass.name}!`);
 
-        // 6. Phát sự kiện đồng bộ cho toàn bộ ứng dụng
+        // 4. Phát sự kiện đồng bộ
         window.dispatchEvent(new CustomEvent('qllh_data_updated', { detail: { source: 'ClassroomManager' } }));
-        pushAllDataToFirestore(getUserScopeId(currentUser)).catch(() => {});
       } catch (err) {
         console.error('Import excel error:', err);
         alert('Đã xảy ra lỗi khi đọc file Excel! Vui lòng kiểm tra file đúng định dạng .xlsx hoặc .xls.');
@@ -1378,7 +1326,6 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     setNewYearInput('');
     setShowAddYearModal(false);
     window.dispatchEvent(new Event('qllh_data_updated'));
-    pushAllDataToFirestore(getUserScopeId(currentUser)).catch(() => {});
   };
 
   // Action: Delete Academic Year
@@ -1402,21 +1349,15 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     const nextStudents = studentsData.filter((s) => remainingClassIds.has(s.classId));
     setClassesData(remainingClasses);
     setStudentsData(nextStudents);
-    saveClassesPermanently(remainingClasses, currentUser);
-    saveStudentsPermanently(nextStudents, currentUser);
 
     const remainingYears = yearsData.filter((y) => y !== targetYear);
     setYearsData(remainingYears);
-    saveYearsPermanently(remainingYears, currentUser);
 
     const nextYear = remainingYears[0];
     setCurrentYear(nextYear);
-    saveCurrentYearPermanently(nextYear, currentUser);
-    localStorage.setItem('qllh_current_year', nextYear);
     setCurrentClassId('');
     if (onSelectClassExternal) onSelectClassExternal('');
     setCurrentView('list');
-    deleteYearFromFirestore(targetYear).catch(() => {});
     window.dispatchEvent(new Event('qllh_data_updated'));
   };
 
@@ -1642,7 +1583,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      📁 Chỉ lớp của tôi ({normalizedClasses.filter((c: ClassItem) => isClassVisibleForUser(c, currentUser, false) && c.year === currentYear).length})
+                      📁 Chỉ lớp của tôi ({normalizedClasses.filter((c: ClassItem) => (c.createdBy === currentUser?.id || c.createdBy === currentUser?.username) && c.year === currentYear).length})
                     </button>
                     <button
                       type="button"

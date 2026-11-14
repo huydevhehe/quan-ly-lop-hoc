@@ -243,9 +243,29 @@
 
 ---
 
+### Giai đoạn 2F: Sửa lỗi "Nối dây thật" & Gỡ Dual-write
+Đã hoàn thành 6 Task:
+1. **Task 1 (`ClassroomManager.tsx`)**: Nối thật 100% với Supabase services (`listMyClasses`, `listStudentsByClass`, `upsertStudents`, `deleteStudent`, `getClassScores`, `saveScore`, `getWeekAttendance`, `saveWeekAttendance`), gỡ sạch các hàm `save*Permanently` và `pushAllDataToFirestore`.
+2. **Task 2 (`ReportsSection.tsx`)**: Sửa triệt để lỗi lệch ID giữa localStorage chuỗi cũ và UUID Supabase. Tải danh sách lớp và học sinh từ Supabase, hiển thị điểm chính xác.
+3. **Task 3 (`QuizBank.tsx`, `DigitalResources.tsx`, `StudentPortal.tsx`)**: Gỡ bỏ 100% các lời gọi `pushAllDataToFirestore` và `syncQuizSubmissionToFirestore` khi thêm/xóa câu hỏi, tài nguyên, nộp bài thi.
+4. **Task 4 (`AdminPanel.tsx`)**: Chuyển quản lý tài khoản sang `adminService.listStaff()`, `createStaffAccount()`, gỡ bỏ tab cấu hình Firebase.
+5. **Task 5 (`App.tsx`, `Sidebar.tsx`, `DataBackupModal.tsx`, `StudentCommentsManager.tsx`)**: Gỡ bỏ realtime Firestore listener và các import legacy, đồng bộ trạng thái qua Supabase services.
+6. **Task 6 (`src/__tests__/no-legacy-imports.test.ts`)**: Viết test guard tự động quét toàn bộ component và App.tsx để đảm bảo không bị tái nhập bất kỳ file legacy nào (PASS 26/26 tests).
+
+---
+
+### Giai đoạn 2E: Dọn dẹp code cũ (Firestore/localStorage)
+Đã hoàn thành toàn bộ 3 Task:
+1. **Task 1**: Kiểm tra an toàn trước khi xóa — đảm bảo không còn bất kỳ component hay file nào trong dự án phụ thuộc vào tầng dữ liệu cũ.
+2. **Task 2**: Xóa vĩnh viễn 3 file `src/firebase.ts`, `src/utils/dbStorage.ts`, `src/utils/userScope.ts`. Gỡ package `firebase` khỏi `package.json` và `node_modules`.
+3. **Task 3**: Dọn dẹp `.env.example` loại bỏ các config không dùng đến, giữ lại cấu hình Supabase chuẩn.
+
+---
+
 ## 3. Kết quả kiểm thử & Chất lượng mã nguồn
 
-- **Unit Test (Vitest)**: Toàn bộ **48/48 test cases đều PASS**.
+- **Unit Test (Vitest)**: Toàn bộ **74/74 test cases (13 test files) đều PASS 100%**.
+  - `src/__tests__/no-legacy-imports.test.ts`: 26 passed.
   - `src/lib/__tests__/supabaseClient.test.ts`: 1 passed.
   - `src/services/__tests__/authService.test.ts`: 4 passed.
   - `src/services/__tests__/classesService.test.ts`: 4 passed.
@@ -258,10 +278,12 @@
   - `src/services/__tests__/adminService.test.ts`: 4 passed.
   - `src/services/__tests__/excelExportService.test.ts`: 2 passed.
   - `src/services/__tests__/quizImageService.test.ts`: 3 passed.
-- **TypeScript Static Analysis (`tsc --noEmit`)**: **0 Lỗi** (Không có cảnh báo hay lỗi kiểu dữ liệu).
+- **TypeScript Static Analysis (`npm run lint` / `tsc --noEmit`)**: **0 Lỗi**.
+- **Production Build (`npm run build`)**: **Thành công 100%** trong < 1s.
 
 ---
 
 ## 4. Kế hoạch các bước tiếp theo
-- **Giai đoạn 3C**: Mở rộng Học liệu số & Game Giải trí mới (`2026-11-14-qllh-giai-doan-3c-hoc-lieu-giai-tri-moi.md`).
-- **Giai đoạn 2E**: Dọn dẹp code Firebase cũ (`2026-11-14-qllh-giai-doan-2e-don-dep-code-cu.md`).
+- **Giai đoạn 3A**: Báo cáo mở rộng & Biểu đồ phân tích chuyên sâu (`2026-11-14-qllh-giai-doan-3a-bao-cao-mo-rong.md`).
+- **Giai đoạn 3B**: Hoàn thiện Edge Function Chống gian lận (đã xong phần core).
+- **Giai đoạn 3C**: Hoàn thiện Học liệu & Giải trí mới (đã xong phần core).

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck,
   Users,
@@ -31,16 +31,6 @@ import { adminService } from '../services/adminService';
 import { studentPermissionsService } from '../services/studentPermissionsService';
 import { soundManager } from '../utils/audio';
 import confetti from 'canvas-confetti';
-import {
-  initFirebase,
-  saveFirebaseConfig,
-  getStoredFirebaseConfig,
-  pushAllDataToFirestore,
-  pushAccountsToFirestore,
-  deleteAccountFromFirestore,
-} from '../firebase';
-import { getSavedClasses, getSavedStudents } from '../utils/dbStorage';
-import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
 
 interface AdminPanelProps {
   accounts: UserAccount[];
@@ -61,38 +51,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   students,
   currentUserId,
 }) => {
-  const [activeTab, setActiveTab] = useState<'permissions' | 'accounts' | 'security' | 'firebase'>('permissions');
+  const [activeTab, setActiveTab] = useState<'permissions' | 'accounts' | 'security'>('permissions');
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
 
-  // Firebase integration state in AdminPanel
-  const [firebaseRawSnippet, setFirebaseRawSnippet] = useState('');
-  const [firebaseApiKey, setFirebaseApiKey] = useState(() => {
-    try {
-      const saved = localStorage.getItem('qllh_firebase_config');
-      return saved ? JSON.parse(saved).apiKey || '' : '';
-    } catch {
-      return '';
-    }
-  });
-  const [firebaseProjectId, setFirebaseProjectId] = useState(() => {
-    try {
-      const saved = localStorage.getItem('qllh_firebase_config');
-      return saved ? JSON.parse(saved).projectId || 'khohoclieuso-afa3c' : 'khohoclieuso-afa3c';
-    } catch {
-      return 'khohoclieuso-afa3c';
-    }
-  });
-  const [firebaseAppId, setFirebaseAppId] = useState(() => {
-    try {
-      const saved = localStorage.getItem('qllh_firebase_config');
-      return saved ? JSON.parse(saved).appId || '' : '';
-    } catch {
-      return '';
-    }
-  });
-  const [firebaseStatusMsg, setFirebaseStatusMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
+  useEffect(() => {
+    adminService.listStaff().then((staffList) => {
+      if (staffList.length > 0) {
+        setAccounts(staffList);
+      }
+    }).catch(() => {});
+  }, []);
 
   // New account form
   const [newUsername, setNewUsername] = useState('');
@@ -123,7 +92,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       const updated = { ...prev, [key]: !prev[key] };
       localStorage.setItem('qllh_student_permissions', JSON.stringify(updated));
       studentPermissionsService.updatePermissions({ [key]: updated[key] }).catch(() => {});
-      pushAllDataToFirestore(currentUserId).catch(() => {});
       return updated;
     });
     setSaveToast(true);
@@ -137,8 +105,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         acc.id === id ? { ...acc, status: acc.status === 'active' ? 'locked' : 'active' } : acc
       );
       localStorage.setItem('qllh_user_accounts', JSON.stringify(updated));
-      pushAccountsToFirestore(updated);
-      pushAllDataToFirestore(currentUserId, updated).catch(() => {});
       return updated;
     });
   };
@@ -153,9 +119,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setAccounts((prev) => {
         const updated = prev.filter((acc) => acc.id !== id);
         localStorage.setItem('qllh_user_accounts', JSON.stringify(updated));
-        pushAccountsToFirestore(updated);
-        pushAllDataToFirestore(currentUserId, updated).catch(() => {});
-        deleteAccountFromFirestore(id).catch(() => {});
         return updated;
       });
       soundManager.playTick();
@@ -205,8 +168,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         return acc;
       });
       localStorage.setItem('qllh_user_accounts', JSON.stringify(updated));
-      pushAccountsToFirestore(updated);
-      pushAllDataToFirestore(currentUserId, updated).catch(() => {});
       return updated;
     });
 
@@ -214,7 +175,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     soundManager.playFanfare();
   };
 
-  const handleCreateAccount = (e: React.FormEvent) => {
+  const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUsername.trim() || !newFullName.trim()) return;
 
@@ -225,6 +186,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
 
     const avatarIcon = newRole === 'admin' ? '👨‍🏫' : newRole === 'teacher' ? '👩‍🏫' : '👦';
+
+    try {
+      const email = newUsername.includes('@') ? newUsername.trim() : `${newUsername.trim().toLowerCase()}@qllh.edu.vn`;
+      const pwd = newPassword.trim() || '123456';
+      await adminService.createStaffAccount(email, pwd, newFullName.trim());
+    } catch {}
 
     const created: UserAccount = {
       id: `u_${Date.now()}`,
@@ -242,8 +209,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setAccounts((prev) => {
       const updated = [created, ...prev];
       localStorage.setItem('qllh_user_accounts', JSON.stringify(updated));
-      pushAccountsToFirestore(updated);
-      pushAllDataToFirestore(currentUserId, updated).catch(() => {});
       return updated;
     });
 
@@ -292,7 +257,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       const filteredNew = newAccounts.filter((a) => !existingUsernames.has(a.username));
       const updated = [...filteredNew, ...prev];
       localStorage.setItem('qllh_user_accounts', JSON.stringify(updated));
-      pushAccountsToFirestore(updated);
       return updated;
     });
 
@@ -322,7 +286,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setAccounts((prev) => {
       const updated = prev.map((a) => (a.role === 'admin' ? { ...a, password: adminNewPassword } : a));
       localStorage.setItem('qllh_user_accounts', JSON.stringify(updated));
-      pushAccountsToFirestore(updated);
       return updated;
     });
 
@@ -379,15 +342,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             }`}
           >
             Đổi mật khẩu Admin
-          </button>
-          <button
-            onClick={() => setActiveTab('firebase')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-              activeTab === 'firebase' ? 'bg-white text-orange-600 shadow-2xs font-bold' : 'text-slate-600'
-            }`}
-          >
-            <Flame className="w-3.5 h-3.5 text-orange-500" />
-            <span>Đồng bộ Firebase</span>
           </button>
         </div>
       </div>
@@ -763,252 +717,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               Cập nhật mật khẩu Quản trị
             </button>
           </form>
-        </div>
-      )}
-
-      {/* TAB 4: FIREBASE INTEGRATION & CLOUD SYNC */}
-      {activeTab === 'firebase' && (
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-2xs space-y-6 animate-in fade-in">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-orange-600 uppercase tracking-wider bg-orange-50 px-2 py-0.5 rounded-md flex items-center gap-1">
-                  <Flame className="w-3.5 h-3.5" /> Firebase Firestore
-                </span>
-                <span className="text-xs text-slate-400">·</span>
-                <span className="text-xs text-slate-500">Dự án: khohoclieuso-afa3c</span>
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mt-1">
-                Kết nối & Đồng bộ dữ liệu trực tuyến
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Đồng bộ tự động danh sách học sinh, điểm số, thời khóa biểu giữa máy tính và điện thoại qua Google Firebase.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${
-                firebaseApiKey ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
-              }`}>
-                <span className={`w-2 h-2 rounded-full ${firebaseApiKey ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-                <span>{firebaseApiKey ? 'Đã có cấu hình kết nối' : 'Chưa cấu hình API Key'}</span>
-              </span>
-            </div>
-          </div>
-
-          {/* Quick paste helper */}
-          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wide flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-amber-500" />
-                <span>Dán nhanh mã cấu hình từ Firebase Console (Dự án: khohoclieuso)</span>
-              </h4>
-              <span className="text-[11px] text-slate-400 font-medium">Hệ thống sẽ tự động trích xuất các trường</span>
-            </div>
-
-            <textarea
-              rows={4}
-              value={firebaseRawSnippet}
-              onChange={(e) => setFirebaseRawSnippet(e.target.value)}
-              placeholder='Dán đoạn mã firebaseConfig vào đây, ví dụ:&#10;const firebaseConfig = {&#10;  apiKey: "AIzaSy...",&#10;  authDomain: "khohoclieuso-afa3c.firebaseapp.com",&#10;  projectId: "khohoclieuso-afa3c", ...&#10;};'
-              className="w-full p-3 font-mono text-xs border border-slate-200 rounded-xl bg-white focus:outline-hidden focus:ring-1 focus:ring-orange-500"
-            />
-
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!firebaseRawSnippet.trim()) return;
-                  try {
-                    // Extract with regex
-                    const apiKeyMatch = firebaseRawSnippet.match(/apiKey:\s*["']([^"']+)["']/);
-                    const authDomainMatch = firebaseRawSnippet.match(/authDomain:\s*["']([^"']+)["']/);
-                    const projectIdMatch = firebaseRawSnippet.match(/projectId:\s*["']([^"']+)["']/);
-                    const appIdMatch = firebaseRawSnippet.match(/appId:\s*["']([^"']+)["']/);
-
-                    const extractedKey = apiKeyMatch ? apiKeyMatch[1] : '';
-                    const extractedDomain = authDomainMatch ? authDomainMatch[1] : 'khohoclieuso-afa3c.firebaseapp.com';
-                    const extractedProject = projectIdMatch ? projectIdMatch[1] : 'khohoclieuso-afa3c';
-                    const extractedAppId = appIdMatch ? appIdMatch[1] : '';
-
-                    if (extractedKey) setFirebaseApiKey(extractedKey);
-                    if (extractedProject) setFirebaseProjectId(extractedProject);
-                    if (extractedAppId) setFirebaseAppId(extractedAppId);
-
-                    saveFirebaseConfig({
-                      apiKey: extractedKey,
-                      authDomain: extractedDomain,
-                      projectId: extractedProject,
-                      appId: extractedAppId,
-                    });
-
-                    setFirebaseStatusMsg({
-                      text: 'Đã trích xuất và lưu cấu hình Firebase thành công!',
-                      type: 'success',
-                    });
-                    soundManager.playStarSound();
-                    confetti({ particleCount: 40, spread: 50, origin: { y: 0.6 } });
-                  } catch (err) {
-                    setFirebaseStatusMsg({
-                      text: 'Không trích xuất được. Vui lòng kiểm tra lại đoạn mã!',
-                      type: 'error',
-                    });
-                  }
-                }}
-                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Tự động phân tích & Lưu cấu hình</span>
-              </button>
-
-              <span className="text-[11px] text-slate-500">
-                Lấy từ: Firebase Console &gt; Project settings &gt; Your apps &gt; &lt;/&gt;
-              </span>
-            </div>
-          </div>
-
-          {/* Detailed field inputs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                API Key (apiKey)
-              </label>
-              <input
-                type="text"
-                value={firebaseApiKey}
-                onChange={(e) => setFirebaseApiKey(e.target.value)}
-                placeholder="AIzaSy..."
-                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl font-mono focus:outline-hidden focus:ring-1 focus:ring-orange-500 bg-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Project ID (projectId)
-              </label>
-              <input
-                type="text"
-                value={firebaseProjectId}
-                onChange={(e) => setFirebaseProjectId(e.target.value)}
-                placeholder="khohoclieuso-afa3c"
-                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl font-mono focus:outline-hidden focus:ring-1 focus:ring-orange-500 bg-white"
-              />
-            </div>
-          </div>
-
-          {/* Action buttons: Test connection & Sync Data */}
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                const saved = saveFirebaseConfig({
-                  apiKey: firebaseApiKey.trim(),
-                  projectId: firebaseProjectId.trim(),
-                  authDomain: `${firebaseProjectId.trim()}.firebaseapp.com`,
-                  appId: firebaseAppId.trim(),
-                });
-                if (!saved || !saved.apiKey) {
-                  setFirebaseStatusMsg({
-                    text: 'Vui lòng nhập API Key để kiểm tra kết nối!',
-                    type: 'error',
-                  });
-                  return;
-                }
-                const res = initFirebase(saved);
-                if (res.app) {
-                  setFirebaseStatusMsg({
-                    text: `Kết nối thành công tới dự án Firebase: ${saved.projectId}!`,
-                    type: 'success',
-                  });
-                  soundManager.playStarSound();
-                } else {
-                  setFirebaseStatusMsg({
-                    text: 'Khởi tạo thất bại, vui lòng kiểm tra lại API Key hoặc Project ID!',
-                    type: 'error',
-                  });
-                }
-              }}
-              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-2"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Kiểm tra kết nối</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={isSyncing || !firebaseApiKey}
-              onClick={async () => {
-                if (!firebaseApiKey) {
-                  alert('Vui lòng lưu API Key trước khi đồng bộ!');
-                  return;
-                }
-                setIsSyncing(true);
-                setFirebaseStatusMsg({ text: 'Đang đẩy dữ liệu lên Firebase Firestore...', type: 'info' });
-
-                try {
-                  const saved = getStoredFirebaseConfig();
-                  const { db } = initFirebase(saved);
-                  if (!db) {
-                    throw new Error('Chưa thể kết nối tới cơ sở dữ liệu Firestore.');
-                  }
-
-                  await pushAllDataToFirestore(currentUserId);
-                  const classes = getSavedClasses(currentUserId);
-                  const stds = getSavedStudents(currentUserId);
-
-                  setFirebaseStatusMsg({
-                    text: `Đồng bộ thành công ${classes.length} lớp và ${stds.length} học sinh của tài khoản lên đám mây Firebase!`,
-                    type: 'success',
-                  });
-                  soundManager.playFanfare();
-                  confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
-                } catch (e: any) {
-                  console.error(e);
-                  setFirebaseStatusMsg({
-                    text: `Lỗi đồng bộ: ${e.message || 'Kiểm tra Firestore Rules hoặc kết nối mạng'}.`,
-                    type: 'error',
-                  });
-                } finally {
-                  setIsSyncing(false);
-                }
-              }}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs transition-colors flex items-center gap-2 cursor-pointer ${
-                firebaseApiKey ? 'bg-orange-600 hover:bg-orange-700' : 'bg-slate-300 cursor-not-allowed'
-              }`}
-            >
-              <CloudUpload className="w-4 h-4" />
-              <span>{isSyncing ? 'Đang tải lên...' : 'Đẩy toàn bộ dữ liệu lên Firebase'}</span>
-            </button>
-          </div>
-
-          {/* Feedback message */}
-          {firebaseStatusMsg && (
-            <div className={`p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2 ${
-              firebaseStatusMsg.type === 'success'
-                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                : firebaseStatusMsg.type === 'error'
-                ? 'bg-rose-50 text-rose-800 border border-rose-200'
-                : 'bg-blue-50 text-blue-800 border border-blue-200'
-            }`}>
-              {firebaseStatusMsg.type === 'success' && <Check className="w-4 h-4 text-emerald-600 shrink-0" />}
-              {firebaseStatusMsg.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />}
-              {firebaseStatusMsg.type === 'info' && <RefreshCw className="w-4 h-4 text-blue-600 animate-spin shrink-0" />}
-              <span>{firebaseStatusMsg.text}</span>
-            </div>
-          )}
-
-          {/* Guide box */}
-          <div className="border-t border-slate-100 pt-5 space-y-2 text-xs text-slate-500">
-            <h5 className="font-bold text-slate-700 uppercase tracking-wider text-[11px]">
-              Hướng dẫn lấy khóa nhanh từ Firebase Console:
-            </h5>
-            <ol className="list-decimal pl-5 space-y-1">
-              <li>Truy cập <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" className="text-blue-600 underline font-bold">console.firebase.google.com</a> và bấm vào dự án <strong>khohoclieuso</strong>.</li>
-              <li>Bấm biểu tượng bánh răng ⚙️ <strong>Project settings</strong> &gt; Cuộn xuống phần <strong>Your apps</strong>.</li>
-              <li>Bấm vào biểu tượng <strong>Web (&lt;/&gt;)</strong> để tạo ứng dụng và sao chép đoạn mã <code>firebaseConfig</code>.</li>
-              <li>Dán đoạn mã vào ô trên và bấm <strong>"Tự động phân tích & Lưu cấu hình"</strong>.</li>
-            </ol>
-          </div>
         </div>
       )}
 

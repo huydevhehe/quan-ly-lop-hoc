@@ -12,7 +12,6 @@ import {
   Share2
 } from 'lucide-react';
 import { DigitalResource } from '../types';
-import { pushAllDataToFirestore } from '../firebase';
 import { createResource } from '../services/resourcesService';
 import { SaveLinkForm } from './resources/SaveLinkForm';
 
@@ -75,8 +74,6 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({
       thumbnailUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=80',
       isActive: true,
     }).catch(() => {});
-
-    pushAllDataToFirestore().catch(() => {});
 
     setShowAddModal(false);
     setNewTitle('');

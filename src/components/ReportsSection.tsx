@@ -14,13 +14,8 @@ import {
 import { StudentCommentsManager, sortStudentsLikeGradeTab } from './StudentCommentsManager';
 
 import { UserAccount } from '../types';
-import { isClassVisibleForUser } from '../utils/userScope';
-import {
-  getSavedClasses,
-  getSavedStudents,
-  getSavedGrades,
-  getSavedCurrentYear,
-} from '../utils/dbStorage';
+import { listMyClasses } from '../services/classesService';
+import { listStudentsByClass } from '../services/studentsService';
 import { getClassScores, saveScore, getClassStats, ClassStats } from '../services/scoresService';
 import { ClassificationPieChart } from './reports/ClassificationPieChart';
 import { ScoreAttendanceBarChart } from './reports/ScoreAttendanceBarChart';
@@ -61,32 +56,52 @@ interface ReportsSectionProps {
 
 export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, currentUser }) => {
   // Current academic year
-  const [currentYear, setCurrentYear] = useState<string>(() => getSavedCurrentYear(currentUser));
+  const [currentYear, setCurrentYear] = useState<string>('2026-2027');
 
   // Classes list
-  const [classesList, setClassesList] = useState<ClassItem[]>(() => getSavedClasses(currentUser));
+  const [classesList, setClassesList] = useState<ClassItem[]>([]);
 
   // Students list
-  const [studentsList, setStudentsList] = useState<StudentRecord[]>(() => getSavedStudents(currentUser));
+  const [studentsList, setStudentsList] = useState<StudentRecord[]>([]);
 
   // Grades data: { [studentId_term]: { lt, th, total, rank } }
-  const [gradeData, setGradeData] = useState<Record<string, GradeRecord>>(() => getSavedGrades(currentUser));
+  const [gradeData, setGradeData] = useState<Record<string, GradeRecord>>({});
 
-  // Listen for user switch and background updates
+  const loadClassesAndStudents = async () => {
+    try {
+      const cls = await listMyClasses();
+      const mappedClasses: ClassItem[] = cls.map((c) => ({
+        id: c.id,
+        year: c.academicYear || '2026-2027',
+        name: c.name,
+        grade: String(c.grade),
+      }));
+      setClassesList(mappedClasses);
+
+      // Load all students for all classes
+      const allStudentsPromises = cls.map((c) => listStudentsByClass(c.id));
+      const allResults = await Promise.all(allStudentsPromises);
+      const combinedStudents: StudentRecord[] = allResults.flatMap((stList) =>
+        stList.map((s) => ({
+          id: s.id,
+          classId: s.classId,
+          code: s.code,
+          name: s.name,
+          dob: s.dob,
+          gender: s.gender,
+        }))
+      );
+      setStudentsList(combinedStudents);
+    } catch (err) {
+      console.error('Lỗi tải dữ liệu báo cáo:', err);
+    }
+  };
+
   useEffect(() => {
-    const handleSync = () => {
-      try {
-        setClassesList(getSavedClasses(currentUser));
-        setStudentsList(getSavedStudents(currentUser));
-        setGradeData(getSavedGrades(currentUser));
-        setCurrentYear(getSavedCurrentYear(currentUser));
-      } catch {}
-    };
-
-    handleSync();
-    window.addEventListener('qllh_data_updated', handleSync);
-    return () => window.removeEventListener('qllh_data_updated', handleSync);
-  }, [currentUser?.id, currentUser?.username]);
+    loadClassesAndStudents();
+    window.addEventListener('qllh_data_updated', loadClassesAndStudents);
+    return () => window.removeEventListener('qllh_data_updated', loadClassesAndStudents);
+  }, [currentUser?.id]);
 
   // Filter states
   // 'all' or specific class ID
@@ -96,34 +111,53 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
   const [searchQuery, setSearchQuery] = useState('');
   const [showCommentsModal, setShowCommentsModal] = useState(false);
 
+  // Classes filtered by current year
+  const yearClasses = useMemo(() => {
+    return classesList.filter((c) => c.year === currentYear);
+  }, [classesList, currentYear]);
+
   // Tải điểm từ Supabase scoresService khi chọn lớp
   useEffect(() => {
-    if (selectedClassId === 'all') return;
     const termKey: 'hk1' | 'ca_nam' = selectedTerm === 'hk1' ? 'hk1' : 'ca_nam';
-    getClassScores(selectedClassId, termKey)
-      .then((scores) => {
-        if (!scores || scores.length === 0) return;
-        setGradeData((prev) => {
-          const next = { ...prev };
-          for (const s of scores) {
-            const key = `${s.studentId}_${selectedTerm}`;
-            next[key] = {
-              lt: s.theoryScore !== null ? String(s.theoryScore) : '',
-              th: s.practiceScore !== null ? String(s.practiceScore) : '',
-              total: s.totalScore !== null ? String(s.totalScore) : '',
-              rank: s.classification || '',
-            };
-          }
-          return next;
-        });
-      })
-      .catch(() => {});
-  }, [selectedClassId, selectedTerm]);
-
-  // Classes filtered by current year AND logged-in user
-  const yearClasses = useMemo(() => {
-    return classesList.filter((c) => c.year === currentYear && isClassVisibleForUser(c, currentUser));
-  }, [classesList, currentYear, currentUser]);
+    if (selectedClassId !== 'all') {
+      getClassScores(selectedClassId, termKey)
+        .then((scores) => {
+          if (!scores || scores.length === 0) return;
+          setGradeData((prev) => {
+            const next = { ...prev };
+            for (const s of scores) {
+              const key = `${s.studentId}_${selectedTerm}`;
+              next[key] = {
+                lt: s.theoryScore !== null ? String(s.theoryScore) : '',
+                th: s.practiceScore !== null ? String(s.practiceScore) : '',
+                total: s.totalScore !== null ? String(s.totalScore) : '',
+                rank: s.classification || '',
+              };
+            }
+            return next;
+          });
+        })
+        .catch(() => {});
+    } else if (yearClasses.length > 0) {
+      Promise.all(yearClasses.map((c) => getClassScores(c.id, termKey).catch(() => [])))
+        .then((results) => {
+          setGradeData((prev) => {
+            const next = { ...prev };
+            results.flat().forEach((s) => {
+              const key = `${s.studentId}_${selectedTerm}`;
+              next[key] = {
+                lt: s.theoryScore !== null ? String(s.theoryScore) : '',
+                th: s.practiceScore !== null ? String(s.practiceScore) : '',
+                total: s.totalScore !== null ? String(s.totalScore) : '',
+                rank: s.classification || '',
+              };
+            });
+            return next;
+          });
+        })
+        .catch(() => {});
+    }
+  }, [selectedClassId, selectedTerm, yearClasses]);
 
   // Selected class object
   const currentSelectedClass = useMemo(() => {

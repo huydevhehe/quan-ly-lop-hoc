@@ -23,9 +23,8 @@ import {
   Plus,
   RefreshCw,
 } from 'lucide-react';
-import { isClassVisibleForUser, getUserScopeId } from '../utils/userScope';
-import { getSavedClasses, getSavedYears } from '../utils/dbStorage';
 import { ActiveTab, StudentPermissions, UserAccount } from '../types';
+import { listMyClasses } from '../services/classesService';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -94,14 +93,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   useEffect(() => {
     const updateSidebarData = () => {
-      try {
-        const storedYears = getSavedYears(currentUser);
-        setSidebarYears(storedYears);
-        const storedClasses = getSavedClasses(currentUser);
-        setSidebarClasses(storedClasses);
-      } catch {
-        // fallback
-      }
+      listMyClasses()
+        .then((classes) => {
+          const mapped = classes.map((c) => ({
+            id: c.id,
+            year: c.academicYear || '2026-2027',
+            name: c.name,
+            grade: String(c.grade),
+          }));
+          setSidebarClasses(mapped);
+          const years = Array.from(new Set(mapped.map((c) => c.year)));
+          if (years.length > 0) {
+            setSidebarYears(years);
+          }
+        })
+        .catch(() => {});
     };
 
     updateSidebarData();
@@ -113,7 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
   }, [activeTab, selectedYear, currentUser?.id, currentUser?.username]);
 
-  const userFilteredClasses = sidebarClasses.filter((c) => isClassVisibleForUser(c, currentUser));
+  const userFilteredClasses = sidebarClasses;
   const classesInCurrentYear = userFilteredClasses.filter((c) => c.year === selectedYear);
 
   const handleCopyCode = (e: React.MouseEvent) => {

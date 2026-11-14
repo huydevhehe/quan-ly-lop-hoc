@@ -26,7 +26,6 @@ import {
 import confetti from 'canvas-confetti';
 import { QuizQuestion, QuizSubmission, Classroom, DigitalResource, Resource } from '../types';
 import { soundManager } from '../utils/audio';
-import { syncQuizSubmissionToFirestore } from '../firebase';
 import { signInStudentWithRoomCode } from '../services/authService';
 import { listActiveTopics, startExamSession, submitExamResult } from '../services/examService';
 import { listResources } from '../services/resourcesService';
@@ -230,8 +229,6 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
       submitExamResult(currentSessionId, correctCount, total, elapsedSeconds).catch(() => {});
     }
 
-    // Sync to Firestore & Local
-    syncQuizSubmissionToFirestore(submission);
     if (onRecordSubmission) {
       onRecordSubmission(submission);
     }

@@ -28,7 +28,6 @@ import * as XLSX from 'xlsx';
 import { QuizQuestion, QuizSubmission } from '../types';
 import { soundManager } from '../utils/audio';
 import { INITIAL_SUBMISSIONS } from '../data/mockData';
-import { pushAllDataToFirestore } from '../firebase';
 import {
   listTopics,
   listQuestionsByTopic,
@@ -228,7 +227,6 @@ export const QuizBank: React.FC<QuizBankProps> = ({ quizzes, setQuizzes, isAdmin
     const updated = [created, ...quizzes];
     setQuizzes(updated);
     localStorage.setItem('qllh_quiz_bank', JSON.stringify(updated));
-    pushAllDataToFirestore().catch(() => {});
     setShowAddModal(false);
     setNewQuestion('');
     setNewOptions(['', '', '', '']);
@@ -241,7 +239,6 @@ export const QuizBank: React.FC<QuizBankProps> = ({ quizzes, setQuizzes, isAdmin
       const updated = quizzes.filter((q) => q.id !== id);
       setQuizzes(updated);
       localStorage.setItem('qllh_quiz_bank', JSON.stringify(updated));
-      pushAllDataToFirestore().catch(() => {});
       soundManager.playTick();
     }
   };
@@ -252,7 +249,6 @@ export const QuizBank: React.FC<QuizBankProps> = ({ quizzes, setQuizzes, isAdmin
       const updated = submissions.filter((s) => s.id !== subId);
       setSubmissions(updated);
       localStorage.setItem('qllh_quiz_submissions', JSON.stringify(updated));
-      pushAllDataToFirestore().catch(() => {});
       soundManager.playTick();
     }
   };
