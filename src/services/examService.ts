@@ -39,7 +39,8 @@ export async function listActiveTopics(grade: number): Promise<ActiveTopic[]> {
 
 /**
  * Bắt đầu phiên thi trắc nghiệm của học sinh.
- * TUYỆT ĐỐI CHỈ ĐỌC TỪ VIEW quiz_questions_public để không lộ đáp án đúng!
+ * Ưu tiên gọi Edge Function start-exam-session (xáo trộn và giấu đáp án server-side).
+ * TUYỆT ĐỐI CHỈ ĐỌC TỪ VIEW quiz_questions_public khi fallback để không lộ đáp án đúng!
  */
 export async function startExamSession(
   studentName: string,
@@ -51,7 +52,21 @@ export async function startExamSession(
     throw new Error('Vui lòng chọn ít nhất một chủ đề thi');
   }
 
-  // Lấy câu hỏi an toàn từ view quiz_questions_public (không chứa cột correct_index)
+  // 1. Gọi Edge Function start-exam-session nếu khả dụng
+  if (supabase.functions && typeof supabase.functions.invoke === 'function') {
+    try {
+      const { data, error } = await supabase.functions.invoke('start-exam-session', {
+        body: { studentName, classId, isFreeSlot, topicIds },
+      });
+      if (!error && data && data.sessionId) {
+        return data as ExamSessionResult;
+      }
+    } catch {
+      // Fallback xuống gọi direct view
+    }
+  }
+
+  // 2. Fallback: Lấy câu hỏi an toàn từ view quiz_questions_public (không chứa cột correct_index)
   const { data: questionsData, error: qError } = await supabase
     .from('quiz_questions_public')
     .select('id, content, options, image_url')
@@ -68,8 +83,6 @@ export async function startExamSession(
     imageUrl: q.image_url || undefined,
   }));
 
-  // Tạo phiên thi trong bảng quiz_sessions
-  // TODO Giai đoạn 3B: xáo trộn câu hỏi/đáp án tại server qua Edge Function
   const questionOrder = questions.map((q) => q.id);
 
   const { data: sessionData, error: sError } = await supabase
@@ -95,17 +108,55 @@ export async function startExamSession(
 }
 
 /**
- * Nộp bài thi trắc nghiệm.
+ * Nộp bài thi trắc nghiệm qua Edge function submit-exam-session (chấm điểm bảo mật phía server).
+ */
+export async function submitExamSession(
+  sessionId: string,
+  answers: Array<{ questionId: string; selectedOptionIndex: number }>,
+  durationSeconds: number
+): Promise<{ score: number; correctCount: number; totalQuestions: number }> {
+  if (durationSeconds <= 0) {
+    throw new Error('Thời gian làm bài không hợp lệ');
+  }
+
+  const { data, error } = await supabase.functions.invoke('submit-exam-session', {
+    body: { sessionId, answers, durationSeconds },
+  });
+
+  if (error || !data) {
+    throw new Error(`Không thể nộp bài thi qua Edge Function: ${error?.message || 'Lỗi server'}`);
+  }
+
+  return data;
+}
+
+/**
+ * Nộp bài thi trắc nghiệm (Tương thích ngược & fallback).
  * Dùng upsert với onConflict: session_id để chống việc double-click tạo 2 dòng kết quả thi trùng.
  */
 export async function submitExamResult(
   sessionId: string,
   correctCount: number,
   totalQuestions: number,
-  durationSeconds: number
+  durationSeconds: number,
+  answers?: Array<{ questionId: string; selectedOptionIndex: number }>
 ): Promise<void> {
   if (durationSeconds <= 0) {
     throw new Error('Thời gian làm bài không hợp lệ');
+  }
+
+  // Nếu có danh sách đáp án, ưu tiên gọi Edge function submit-exam-session
+  if (answers && answers.length > 0 && supabase.functions && typeof supabase.functions.invoke === 'function') {
+    try {
+      const { data, error } = await supabase.functions.invoke('submit-exam-session', {
+        body: { sessionId, answers, durationSeconds },
+      });
+      if (!error && data) {
+        return;
+      }
+    } catch {
+      // Fallback sang upsert trực tiếp
+    }
   }
 
   const score = totalQuestions > 0 ? (correctCount / totalQuestions) * 10 : 0;

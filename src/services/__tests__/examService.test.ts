@@ -4,6 +4,9 @@ vi.mock('../../lib/supabaseClient', () => {
   return {
     supabase: {
       from: vi.fn(),
+      functions: {
+        invoke: vi.fn(),
+      },
     },
   };
 });
@@ -13,6 +16,7 @@ import {
   listActiveTopics,
   startExamSession,
   submitExamResult,
+  submitExamSession,
 } from '../examService';
 
 describe('examService', () => {
@@ -95,4 +99,28 @@ describe('examService', () => {
     expect(result.questions.length).toBe(1);
     expect(result.questions[0].content).toBe('Cau hoi 1');
   });
+
+  it('submitExamSession goi supabase.functions.invoke submit-exam-session', async () => {
+    (supabase.functions.invoke as any).mockResolvedValue({
+      data: { score: 9.0, correctCount: 9, totalQuestions: 10 },
+      error: null,
+    });
+
+    const res = await submitExamSession(
+      'session-xyz',
+      [{ questionId: 'q1', selectedOptionIndex: 2 }],
+      60
+    );
+
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('submit-exam-session', {
+      body: {
+        sessionId: 'session-xyz',
+        answers: [{ questionId: 'q1', selectedOptionIndex: 2 }],
+        durationSeconds: 60,
+      },
+    });
+    expect(res.score).toBe(9.0);
+    expect(res.correctCount).toBe(9);
+  });
 });
+
