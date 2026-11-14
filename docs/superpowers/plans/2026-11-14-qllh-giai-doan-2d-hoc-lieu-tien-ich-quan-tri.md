@@ -146,15 +146,15 @@
 **Interfaces:**
 - Consumes: `resourcesService`, `adminService`, `studentPermissionsService` từ Task 2/3.
 
-- [ ] **Step 1: Đọc 4 file, tìm mọi chỗ đọc/ghi `localStorage.qllh_digital_resources`, mảng `accounts`, `qllh_student_permissions`**
+- [x] **Step 1: Đọc 4 file, tìm mọi chỗ đọc/ghi `localStorage.qllh_digital_resources`, mảng `accounts`, `qllh_student_permissions`**
 
-- [ ] **Step 2: Thay từng chỗ bằng service tương ứng**
+- [x] **Step 2: Thay từng chỗ bằng service tương ứng**
   3 component Học liệu số/Giải trí/Tiện ích → `resourcesService` (lọc đúng `type`). `AdminPanel.tsx` → `adminService` (danh sách GV, tạo mới, gán lớp) + `studentPermissionsService` (bật/tắt quyền xem của học sinh).
 
-- [ ] **Step 3: Kiểm tra thủ công 2 chiều (Review Focus #5)**
+- [x] **Step 3: Kiểm tra thủ công 2 chiều (Review Focus #5)**
   Tạo 1 resource loại `game`, bật `is_active` → mở `StudentPortal.tsx` xem mục Giải trí phải hiện; tắt `is_active` → phải biến mất.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
   ```bash
   git add src/components/DigitalResources.tsx src/components/GamesSection.tsx src/components/UtilitiesSection.tsx src/components/AdminPanel.tsx
   git commit -m "feat: wire resources and admin UI to Supabase services"

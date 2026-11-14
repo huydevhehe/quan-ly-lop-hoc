@@ -27,6 +27,8 @@ import {
   Pencil,
 } from 'lucide-react';
 import { Classroom, Student, StudentPermissions, UserAccount, UserRole } from '../types';
+import { adminService } from '../services/adminService';
+import { studentPermissionsService } from '../services/studentPermissionsService';
 import { soundManager } from '../utils/audio';
 import confetti from 'canvas-confetti';
 import {
@@ -120,6 +122,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setPermissions((prev) => {
       const updated = { ...prev, [key]: !prev[key] };
       localStorage.setItem('qllh_student_permissions', JSON.stringify(updated));
+      studentPermissionsService.updatePermissions({ [key]: updated[key] }).catch(() => {});
       pushAllDataToFirestore(currentUserId).catch(() => {});
       return updated;
     });

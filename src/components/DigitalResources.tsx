@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { DigitalResource } from '../types';
 import { pushAllDataToFirestore } from '../firebase';
+import { createResource } from '../services/resourcesService';
 
 interface DigitalResourcesProps {
   resources: DigitalResource[];
@@ -62,6 +63,17 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({
     const updated = [newRes, ...resources];
     setResources(updated);
     localStorage.setItem('qllh_digital_resources', JSON.stringify(updated));
+
+    // Lưu vào Supabase resources
+    createResource({
+      type: 'video',
+      grade: newGrade,
+      title: newTitle.trim(),
+      url: newVideoUrl.trim() || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=80',
+      isActive: true,
+    }).catch(() => {});
+
     pushAllDataToFirestore().catch(() => {});
 
     setShowAddModal(false);
