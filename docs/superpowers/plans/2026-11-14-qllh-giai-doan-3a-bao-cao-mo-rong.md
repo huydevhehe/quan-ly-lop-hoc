@@ -147,10 +147,10 @@
   - `exportFinalReportExcel(classInfo: { schoolName: string; className: string; semester: string; schoolYear: string; subject: string; teacherName: string }, students: Array<{ stt: number; studentCode: string; fullName: string; theoryScore: number|null; practiceScore: number|null; totalScore: number|null; classification: string|null; absenceExcused: number; absenceUnexcused: number }>): Promise<Blob>`
   - `exportWeeklyCommentsExcel(students: Array<{ studentCode: string; fullName: string; weeklyComments: Record<number, string> }>): Promise<Blob>` (35 cột tuần)
 
-- [ ] **Step 1: Cài thư viện**
+- [x] **Step 1: Cài thư viện**
   Chạy: `npm install exceljs`.
 
-- [ ] **Step 2: Viết test "ten dai khong vo layout" (Review Focus #4 — kiểm tra ở mức dữ liệu, không kiểm tra pixel)**
+- [x] **Step 2: Viết test "ten dai khong vo layout" (Review Focus #4 — kiểm tra ở mức dữ liệu, không kiểm tra pixel)**
   ```ts
   test('exportFinalReportExcel khong nem loi voi ten rat dai', async () => {
     const blob = await exportFinalReportExcel(classInfo, [{ ...mockStudent, fullName: 'Nguyễn Thị Rất Là Dài Tên Ví Dụ Để Kiểm Tra Auto Fit Cột' }]);
@@ -158,25 +158,25 @@
   });
   ```
 
-- [ ] **Step 3: Chạy test, xác nhận fail**
+- [x] **Step 3: Chạy test, xác nhận fail**
   Expected: FAIL vì `excelExportService` chưa tồn tại.
 
-- [ ] **Step 4: Implement `exportFinalReportExcel`**
+- [x] **Step 4: Implement `exportFinalReportExcel`**
   Dùng `exceljs`: header (tên trường, lớp, học kỳ, năm học, môn, GV), cột STT/Mã HS/Họ tên (sort alpha B)/Lý thuyết/Thực hành/Tổng/Xếp loại/Chuyên cần, footer thống kê số lượng + % mỗi loại T/H/C (dùng lại công thức ở Task 1, không tính lại). Font Times New Roman cỡ 13, `worksheet.columns.forEach(c => c.width = ...)` tính theo độ dài chuỗi dài nhất trong cột (auto-fit thủ công vì exceljs không tự auto-fit), border `thin` toàn bảng, header bold.
 
-- [ ] **Step 5: Implement `exportWeeklyCommentsExcel`**
+- [x] **Step 5: Implement `exportWeeklyCommentsExcel`**
   Cột cố định (Mã HS, Họ tên) + 35 cột tuần (đúng số tuần trong 1 năm học theo thiết kế hiện tại), mỗi ô là nhận xét tuần đó; định dạng tương tự Task 4 Step 4.
 
-- [ ] **Step 6: Chạy lại test**
+- [x] **Step 6: Chạy lại test**
   Expected: PASS.
 
-- [ ] **Step 7: Nối 2 nút "Xuất Excel" trong `ReportsSection.tsx` vào 2 hàm trên**
+- [x] **Step 7: Nối 2 nút "Xuất Excel" trong `ReportsSection.tsx` vào 2 hàm trên**
   Thay nút xuất Excel cũ (dùng `xlsx`) bằng gọi `excelExportService`, tạo link tải `Blob` xuống (dùng pattern tương tự `exportFullBackupFile` cũ đã thấy ở `dbStorage.ts`, nhưng tạo `Blob` thật từ `exceljs` thay vì chuỗi JSON).
 
-- [ ] **Step 8: Kiểm tra thủ công bằng cách mở file thật**
+- [x] **Step 8: Kiểm tra thủ công bằng cách mở file thật**
   Xuất 1 file, mở bằng Microsoft Word/Excel hoặc LibreOffice thật trên máy — xác nhận có border, bold header, font đúng, cột không bị cắt chữ tên dài (đúng Review Focus #4, kiểm tra bằng mắt vì layout không test tự động được chính xác 100%).
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
   ```bash
   git add package.json package-lock.json src/services/excelExportService.ts src/services/__tests__/excelExportService.test.ts src/components/ReportsSection.tsx
   git commit -m "feat: add standardized Excel export for final report and weekly comments"
