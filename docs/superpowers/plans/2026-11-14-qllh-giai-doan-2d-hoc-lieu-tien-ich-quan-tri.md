@@ -110,7 +110,7 @@
   - `studentPermissionsService.getPermissions(): Promise<StudentPermissions>` (type có sẵn ở `src/types/index.ts`)
   - `studentPermissionsService.updatePermissions(patch: Partial<StudentPermissions>): Promise<void>`
 
-- [ ] **Step 1: Viết test "tạo tài khoản trùng email"**
+- [x] **Step 1: Viết test "tạo tài khoản trùng email"**
   ```ts
   test('createStaffAccount tra loi khi email da ton tai', async () => {
     const result = await adminService.createStaffAccount('gv1@qllh.local', 'matkhau123', 'Co Giao B');
@@ -118,16 +118,16 @@
   });
   ```
 
-- [ ] **Step 2: Chạy test, xác nhận fail**
+- [x] **Step 2: Chạy test, xác nhận fail**
   Expected: FAIL vì `adminService` chưa tồn tại.
 
-- [ ] **Step 3: Implement cả 2 service**
+- [x] **Step 3: Implement cả 2 service**
   `createStaffAccount` gọi `supabase.functions.invoke`, map lỗi trả về từ Edge Function thành `{ error: string }`. `studentPermissionsService` thao tác thẳng dòng duy nhất trong `student_permissions` (lấy theo `order by updated_at desc limit 1` hoặc id cố định tạo sẵn ở seed).
 
-- [ ] **Step 4: Chạy lại test**
+- [x] **Step 4: Chạy lại test**
   Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
   ```bash
   git add src/services/adminService.ts src/services/studentPermissionsService.ts src/services/__tests__/adminService.test.ts
   git commit -m "feat: add adminService and studentPermissionsService"
