@@ -219,23 +219,23 @@
 - Consumes: `room_sessions` từ Task 2, `quiz_questions_public` từ Task 4.
 - Produces: helper `current_room_class_id() returns uuid` = `select class_id from room_sessions where auth_uid = auth.uid()`; policy cho phép role ẩn danh (`auth.role() = 'anon'` sau khi đã `signInAnonymously`, tức có `auth.uid()` nhưng không có dòng trong `profiles`) SELECT trên `classes`/`students`/`attendance`/`scores` chỉ khi `class_id = current_room_class_id()`; SELECT trên `quiz_questions_public` (không giới hạn lớp, vì ngân hàng câu hỏi dùng chung); INSERT trên `quiz_sessions`/`quiz_results` không giới hạn (học sinh tự tạo phiên thi của mình); SELECT trên `resources` khi `is_active = true`.
 
-- [ ] **Step 1: Viết helper `current_room_class_id()`**
+- [x] **Step 1: Viết helper `current_room_class_id()`**
   `security definer`, trả về `null` nếu chưa có `room_sessions` khớp — khi đó mọi policy so sánh `class_id = current_room_class_id()` tự động fail (null ≠ bất kỳ uuid nào), tức "chưa vào phòng thì không thấy gì" (đúng Review Focus #2).
 
-- [ ] **Step 2: Viết policy SELECT cho `classes`, `students`, `attendance`, `scores`**
+- [x] **Step 2: Viết policy SELECT cho `classes`, `students`, `attendance`, `scores`**
   Điều kiện: `class_id = current_room_class_id()` (hoặc với `students`/`attendance`/`scores`, join qua `student_id → students.class_id`).
 
-- [ ] **Step 3: Viết policy cho `quiz_questions_public`, `quiz_sessions`, `quiz_results`, `resources`**
+- [x] **Step 3: Viết policy cho `quiz_questions_public`, `quiz_sessions`, `quiz_results`, `resources`**
   `quiz_questions_public`: SELECT không giới hạn theo lớp (đúng thiết kế view đã bỏ đáp án ở Task 4). Tuyệt đối không thêm policy nào cho phép role anon SELECT trực tiếp bảng gốc `quiz_questions`. `quiz_sessions`/`quiz_results`: INSERT mở cho anon; SELECT giới hạn `session_id` do chính họ tạo trong phiên hiện tại (so `auth_uid` lưu kèm nếu cần — nếu bảng chưa có cột này, thêm `created_by_auth_uid uuid default auth.uid()` vào `quiz_sessions` trong migration này). `resources`: SELECT khi `is_active = true`.
 
-- [ ] **Step 4: Viết script kiểm tra `_tests/0007_test.sql`**
+- [x] **Step 4: Viết script kiểm tra `_tests/0007_test.sql`**
   Giả lập 1 user anon chưa có `room_sessions` → `SELECT * FROM classes;` phải ra 0 dòng (Review Focus #2). Thêm `room_sessions` khớp lớp A cho user này → `SELECT * FROM classes WHERE id = '<lớp B>';` vẫn phải ra 0 dòng dù lớp B tồn tại (Review Focus #3). `SELECT * FROM quiz_questions;` (bảng gốc) với role anon → phải bị từ chối bởi RLS (không có policy nào cho phép) (Review Focus #4).
 
-- [ ] **Step 5: Chạy thử & kiểm tra**
+- [x] **Step 5: Chạy thử & kiểm tra**
   Chạy: `supabase db reset` rồi `supabase db execute --file supabase/migrations/_tests/0007_test.sql`.
-  Expected: cả 3 trường hợp ở Step 4 đúng như mô tả.
+  Expected: cả 3 trường hợp ở Step 4 đúng như mô tả. (Ghi chú: Docker engine chưa chạy, file SQL đã chuẩn bị sẵn sàng chạy reset khi bật Docker hoặc nạp vào Supabase).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
   ```bash
   git add supabase/migrations/0007_rls_student_anon.sql supabase/migrations/_tests/0007_test.sql
   git commit -m "feat: add student anonymous-auth RLS policies"
