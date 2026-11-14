@@ -20,14 +20,16 @@ import {
   X,
   User,
   GraduationCap,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ExternalLink,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { QuizQuestion, QuizSubmission, Classroom, DigitalResource } from '../types';
+import { QuizQuestion, QuizSubmission, Classroom, DigitalResource, Resource } from '../types';
 import { soundManager } from '../utils/audio';
 import { syncQuizSubmissionToFirestore } from '../firebase';
 import { signInStudentWithRoomCode } from '../services/authService';
 import { listActiveTopics, startExamSession, submitExamResult } from '../services/examService';
+import { listResources } from '../services/resourcesService';
 
 interface StudentPortalProps {
   roomCode: string;
@@ -80,6 +82,24 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
   const [activeResourceModal, setActiveResourceModal] = useState<DigitalResource | null>(null);
   const [isGameModalOpen, setIsGameModalOpen] = useState(false);
   const [isResourcesListOpen, setIsResourcesListOpen] = useState(false);
+  const [activeGamesList, setActiveGamesList] = useState<Resource[]>([]);
+  const [activeLinksList, setActiveLinksList] = useState<Resource[]>([]);
+
+  useEffect(() => {
+    if (isGameModalOpen) {
+      listResources('game')
+        .then((data) => setActiveGamesList(data.filter((g) => g.isActive !== false)))
+        .catch(() => {});
+    }
+  }, [isGameModalOpen]);
+
+  useEffect(() => {
+    if (isResourcesListOpen) {
+      listResources('link', selectedGrade)
+        .then((data) => setActiveLinksList(data.filter((l) => l.isActive !== false)))
+        .catch(() => {});
+    }
+  }, [isResourcesListOpen, selectedGrade]);
 
   // Validate room code
   const handleVerifyCode = async (e: React.FormEvent) => {
@@ -927,6 +947,35 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                     </div>
                   ))
               )}
+
+              {/* Danh sách liên kết học liệu số mới */}
+              {activeLinksList.length > 0 && (
+                <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <h4 className="text-xs font-bold text-slate-700">Liên kết website học tập & tài liệu:</h4>
+                  <div className="space-y-2">
+                    {activeLinksList.map((link) => (
+                      <div
+                        key={link.id}
+                        className="p-3 rounded-2xl bg-slate-50 border border-slate-200 hover:border-sky-300 transition-all flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <h5 className="font-bold text-slate-800 text-xs truncate">{link.title}</h5>
+                          <p className="text-[11px] text-slate-400 truncate font-mono">{link.url}</p>
+                        </div>
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Mở link</span>
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -968,23 +1017,90 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
       {/* Mini Game Modal */}
       {isGameModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md p-6 text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mx-auto text-2xl">
-              🎮
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold">
+                  🎮
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 text-base">Góc Giải Trí Tin Học</h3>
+                  <p className="text-[11px] text-slate-500">
+                    Trò chơi luyện gõ 10 ngón phím và thử thách trí tuệ máy tính vui nhộn
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsGameModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <h3 className="font-bold text-slate-800 text-lg">Góc Giải Trí Tin Học</h3>
-            <p className="text-xs text-slate-500">
-              Các trò chơi luyện gõ 10 ngón phím, ghép chữ cái và thử thách trí tuệ máy tính vui nhộn!
-            </p>
-            <div className="p-4 bg-purple-50 rounded-2xl text-xs text-purple-800 font-medium">
-              Thầy cô đã kích hoạt chế độ vừa học vừa chơi. Hãy hoàn thành các bài thi trắc nghiệm để nhận thêm sao thưởng nhé!
+
+            <div className="p-6 overflow-y-auto space-y-4">
+              {activeGamesList.length === 0 ? (
+                <div className="text-center py-8 space-y-3">
+                  <div className="w-14 h-14 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mx-auto text-2xl">
+                    🕹️
+                  </div>
+                  <p className="text-slate-500 text-xs">
+                    Hiện chưa có trò chơi nào được kích hoạt. Hãy đón chờ thầy cô mở game nhé!
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {activeGamesList.map((game) => (
+                    <div
+                      key={game.id}
+                      className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs hover:shadow-md hover:border-purple-300 transition-all flex flex-col justify-between"
+                    >
+                      <div className="relative aspect-video w-full bg-slate-900 overflow-hidden">
+                        <img
+                          src={
+                            game.thumbnailUrl ||
+                            'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80'
+                          }
+                          alt={game.title}
+                          className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 opacity-90"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      <div className="p-3.5 space-y-2">
+                        <h4 className="font-bold text-slate-800 text-xs line-clamp-1">{game.title}</h4>
+                        <button
+                          onClick={() => {
+                            if (!game.url) {
+                              alert('Liên kết trò chơi không hợp lệ hoặc đã bị gỡ.');
+                              return;
+                            }
+                            try {
+                              const validUrl = new URL(game.url);
+                              window.open(validUrl.toString(), '_blank', 'noopener,noreferrer');
+                            } catch {
+                              alert('Không thể mở trò chơi: Địa chỉ web không hợp lệ.');
+                            }
+                          }}
+                          className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Chơi trò chơi</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <button
-              onClick={() => setIsGameModalOpen(false)}
-              className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
-            >
-              Đã hiểu, quay lại học tập!
-            </button>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
+              <button
+                onClick={() => setIsGameModalOpen(false)}
+                className="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}
