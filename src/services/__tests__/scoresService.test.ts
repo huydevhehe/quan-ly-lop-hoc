@@ -9,7 +9,7 @@ vi.mock('../../lib/supabaseClient', () => {
 });
 
 import { supabase } from '../../lib/supabaseClient';
-import { getClassScores, saveScore } from '../scoresService';
+import { getClassScores, saveScore, getClassStats } from '../scoresService';
 
 describe('scoresService', () => {
   beforeEach(() => {
@@ -69,3 +69,62 @@ describe('scoresService', () => {
     expect(scores[0].classification).toBe('T');
   });
 });
+
+
+  it('getClassStats tra ve so 0 het khi lop chua co hoc sinh', async () => {
+    const eqMock = vi.fn().mockResolvedValue({ data: [], error: null });
+    const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
+    (supabase.from as any).mockReturnValue({ select: selectMock });
+
+    const stats = await getClassStats('empty-class', 'hk1');
+    expect(stats.classificationCounts).toEqual({ T: 0, H: 0, C: 0, none: 0 });
+    expect(stats.scoreBuckets).toEqual({
+      '9-10': 0,
+      '7-8': 0,
+      '5-6': 0,
+      'duoi-5': 0,
+    });
+  });
+
+  it('getClassStats tinh hoc sinh chua cham diem vao nhom none', async () => {
+    // 1 hoc sinh da cham (T, 9.5), 1 hoc sinh chua cham (null)
+    const mockStudents = [
+      { id: 's1', class_id: 'class-1' },
+      { id: 's2', class_id: 'class-1' },
+    ];
+    const mockScores = [
+      { student_id: 's1', classification: 'T', total_score: 9.5 },
+    ];
+    const mockAttendance = [
+      { student_id: 's2', status: 'unexcused' },
+    ];
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'students') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: mockStudents, error: null }),
+          }),
+        };
+      }
+      if (table === 'scores') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: mockScores, error: null }),
+          }),
+        };
+      }
+      if (table === 'attendance') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: mockAttendance, error: null }),
+          }),
+        };
+      }
+      return {};
+    });
+
+    const stats = await getClassStats('class-1', 'hk1');
+    expect(stats.classificationCounts.T).toBe(1);
+    expect(stats.classificationCounts.none).toBe(1);
+  });

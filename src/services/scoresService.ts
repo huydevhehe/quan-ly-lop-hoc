@@ -81,3 +81,102 @@ export async function saveScore(
     throw new Error(`Không thể lưu điểm: ${error.message}`);
   }
 }
+
+
+export interface ClassStats {
+  classificationCounts: { T: number; H: number; C: number; none: number };
+  scoreBuckets: { '9-10': number; '7-8': number; '5-6': number; 'duoi-5': number };
+  absenceBuckets: Record<string, number>;
+}
+
+/**
+ * Thống kê bảng điểm và chuyên cần của lớp học
+ */
+export async function getClassStats(
+  classId: string,
+  semester: Semester
+): Promise<ClassStats> {
+  // 1. Lấy danh sách học sinh của lớp
+  const { data: students, error: stdError } = await supabase
+    .from('students')
+    .select('id')
+    .eq('class_id', classId);
+
+  if (stdError) {
+    throw new Error(`Lỗi lấy học sinh: ${stdError.message}`);
+  }
+
+  const studentList = students || [];
+  const totalStudents = studentList.length;
+
+  if (totalStudents === 0) {
+    return {
+      classificationCounts: { T: 0, H: 0, C: 0, none: 0 },
+      scoreBuckets: { '9-10': 0, '7-8': 0, '5-6': 0, 'duoi-5': 0 },
+      absenceBuckets: { '0': 0, '1-2': 0, '>2': 0 },
+    };
+  }
+
+  const studentIds = studentList.map((s: any) => s.id);
+
+  // 2. Lấy điểm số của học sinh trong lớp theo học kỳ
+  const { data: scoresData } = await supabase
+    .from('scores')
+    .select('student_id, total_score, classification')
+    .eq('semester', semester);
+
+  const scoreMap = new Map<string, any>();
+  for (const item of scoresData || []) {
+    if (studentIds.includes(item.student_id)) {
+      scoreMap.set(item.student_id, item);
+    }
+  }
+
+  const classificationCounts = { T: 0, H: 0, C: 0, none: 0 };
+  const scoreBuckets = { '9-10': 0, '7-8': 0, '5-6': 0, 'duoi-5': 0 };
+
+  for (const sId of studentIds) {
+    const sc = scoreMap.get(sId);
+    if (!sc || sc.total_score === null || sc.classification === null) {
+      classificationCounts.none++;
+    } else {
+      if (sc.classification === 'T') classificationCounts.T++;
+      else if (sc.classification === 'H') classificationCounts.H++;
+      else if (sc.classification === 'C') classificationCounts.C++;
+      else classificationCounts.none++;
+
+      const t = Number(sc.total_score);
+      if (t >= 9) scoreBuckets['9-10']++;
+      else if (t >= 7) scoreBuckets['7-8']++;
+      else if (t >= 5) scoreBuckets['5-6']++;
+      else scoreBuckets['duoi-5']++;
+    }
+  }
+
+  // 3. Đếm số buổi vắng không phép từ bảng attendance
+  const { data: attData } = await supabase
+    .from('attendance')
+    .select('student_id, status')
+    .eq('status', 'unexcused');
+
+  const absenceCounts = new Map<string, number>();
+  for (const a of attData || []) {
+    if (studentIds.includes(a.student_id)) {
+      absenceCounts.set(a.student_id, (absenceCounts.get(a.student_id) || 0) + 1);
+    }
+  }
+
+  const absenceBuckets = { '0': 0, '1-2': 0, '>2': 0 };
+  for (const sId of studentIds) {
+    const count = absenceCounts.get(sId) || 0;
+    if (count === 0) absenceBuckets['0']++;
+    else if (count <= 2) absenceBuckets['1-2']++;
+    else absenceBuckets['>2']++;
+  }
+
+  return {
+    classificationCounts,
+    scoreBuckets,
+    absenceBuckets,
+  };
+}
