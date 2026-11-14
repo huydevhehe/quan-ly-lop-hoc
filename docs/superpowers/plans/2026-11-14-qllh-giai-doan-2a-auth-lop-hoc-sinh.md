@@ -131,19 +131,19 @@
   - `updateClass(id: string, patch: Partial<{ name: string; grade: number; isOpen: boolean }>): Promise<void>`
   - `deleteClass(id: string): Promise<void>`
 
-- [ ] **Step 1: Viết test "GV chỉ thấy lớp mình" (Review Focus #3)**
+- [x] **Step 1: Viết test "GV chỉ thấy lớp mình" (Review Focus #3)**
   Test tích hợp (cần 2 tài khoản GV mẫu đã seed ở Giai đoạn 1 `supabase/seed/seed.sql`): đăng nhập GV A qua `authService.signInStaff`, gọi `listMyClasses()` → kết quả không được chứa lớp nào có `created_by` khác GV A.
 
-- [ ] **Step 2: Chạy test, xác nhận fail**
+- [x] **Step 2: Chạy test, xác nhận fail**
   Expected: FAIL vì `classesService` chưa tồn tại.
 
-- [ ] **Step 3: Implement 4 hàm**
+- [x] **Step 3: Implement 4 hàm**
   `listMyClasses`: `select * from classes` (RLS tự lọc theo `is_class_owner`, không cần `where` thủ công ở FE) → map `room_code → roomCode`, `school_year_id → ...`, đếm `totalStudents` bằng `select count(*) from students where class_id = ...` riêng mỗi lớp hoặc 1 query `group by`. `createClass`: sinh `room_code` ngẫu nhiên 6 ký tự hoa (giữ đúng định dạng cũ kiểu `F08AF1`) nếu không truyền sẵn, `insert into classes`. `updateClass`/`deleteClass`: update/delete thẳng theo `id`, dựa vào RLS để chặn nếu không phải chủ lớp.
 
-- [ ] **Step 4: Chạy lại test**
+- [x] **Step 4: Chạy lại test**
   Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
   ```bash
   git add src/services/classesService.ts src/services/__tests__/classesService.test.ts
   git commit -m "feat: add classesService backed by Supabase"
