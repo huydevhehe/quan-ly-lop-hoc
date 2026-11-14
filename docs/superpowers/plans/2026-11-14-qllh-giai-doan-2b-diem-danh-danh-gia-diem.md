@@ -118,16 +118,16 @@
 **Interfaces:**
 - Consumes: `attendanceService` từ Task 1.
 
-- [ ] **Step 1: Đọc file, tìm mọi chỗ gọi `getSavedWeeks`, `saveWeeksPermanently`, `getSavedEvals`, `saveEvalsPermanently` (từ `dbStorage.ts`) trong component xử lý tab "Tuần"**
+- [x] **Step 1: Đọc file, tìm mọi chỗ gọi `getSavedWeeks`, `saveWeeksPermanently`, `getSavedEvals`, `saveEvalsPermanently` (từ `dbStorage.ts`) trong component xử lý tab "Tuần"**
   (Đây là component chưa đọc đầy đủ khi viết plan này — đọc trước khi sửa, không đoán tên biến/state.)
 
-- [ ] **Step 2: Thay bằng gọi `attendanceService`**
+- [x] **Step 2: Thay bằng gọi `attendanceService`**
   `getSavedWeeks`/`getSavedEvals` (đọc dữ liệu tuần đang chọn) → `attendanceService.getWeekAttendance(classId, weekNumber)` + `getWeekEvaluations(...)`. `saveWeeksPermanently`/`saveEvalsPermanently` (khi bấm nút điểm danh/lưu nhận xét) → `saveWeekAttendance`/`saveWeekEvaluation`.
 
-- [ ] **Step 3: Kiểm tra thủ công**
+- [x] **Step 3: Kiểm tra thủ công**
   Chạy `npm run dev`, vào 1 lớp → tab Tuần → điểm danh + ghi nhận xét vài học sinh → đổi tuần rồi quay lại → dữ liệu phải còn nguyên (đọc đúng từ Supabase, không phải cache cũ của localStorage).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
   ```bash
   git add src/components/ClassroomManager.tsx
   git commit -m "feat: wire weekly attendance and evaluation UI to attendanceService"

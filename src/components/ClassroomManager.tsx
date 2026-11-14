@@ -28,6 +28,12 @@ import { Student, UserAccount } from '../types';
 import { listMyClasses, createClass, updateClass, deleteClass } from '../services/classesService';
 import { listStudentsByClass, upsertStudents, deleteStudent } from '../services/studentsService';
 import {
+  getWeekAttendance,
+  saveWeekAttendance,
+  getWeekEvaluations,
+  saveWeekEvaluation,
+} from '../services/attendanceService';
+import {
   pushAllDataToFirestore,
   deleteClassFromFirestore,
   deleteStudentFromFirestore,
@@ -642,6 +648,26 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       },
     }));
     setSaveEvalSuccess(true);
+
+    // Lưu vào Supabase attendance & weekly_evaluations
+    const attStatus =
+      currentAttVal === 'Có mặt'
+        ? 'present'
+        : currentAttVal === 'Vắng'
+        ? 'unexcused'
+        : 'present';
+    saveWeekAttendance(currentWeek, [
+      {
+        studentId: selectedEvalStudentId,
+        status: attStatus,
+        note: evalCustomText,
+      },
+    ]).catch(() => {});
+
+    if (evalCustomText.trim()) {
+      saveWeekEvaluation(selectedEvalStudentId, currentWeek, evalCustomText.trim()).catch(() => {});
+    }
+
     pushAllDataToFirestore(getUserScopeId(currentUser)).catch(() => {});
     setTimeout(() => setSaveEvalSuccess(false), 1500);
   };
