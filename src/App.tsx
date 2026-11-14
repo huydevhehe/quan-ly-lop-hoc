@@ -22,7 +22,6 @@ import {
   INITIAL_STUDENTS,
   INITIAL_QUIZZES,
   INITIAL_RESOURCES,
-  INITIAL_ACCOUNTS,
   INITIAL_PERMISSIONS,
 } from './data/mockData';
 import {
@@ -36,26 +35,28 @@ import {
 } from './types';
 import { soundManager } from './utils/audio';
 import confetti from 'canvas-confetti';
-import { getCurrentSession } from './services/authService';
+import { restoreSession, signOut } from './services/authService';
 import { listMyClasses } from './services/classesService';
 import { listStudentsByClass } from './services/studentsService';
 
+const GUEST_ACCOUNT: UserAccount = {
+  id: '',
+  username: '',
+  fullName: 'Khách',
+  role: 'student',
+  status: 'active',
+  createdAt: new Date().toISOString(),
+};
+
 export default function App() {
-  // Main view mode: 'portal' (Image 1 & Image 2) or 'teacher' (Teacher management workspace)
-  // Main view mode: 'portal' (Student Hub) or 'teacher' (Teacher workspace)
+  // Main view mode: 'portal' (Student Hub) or 'teacher' (Teacher workspace).
+  // Chỉ chuyển sang 'teacher' sau khi xác nhận có phiên đăng nhập thật (xem useEffect khôi phục phiên).
   const [viewMode, setViewMode] = useState<'portal' | 'teacher'>(() => {
     try {
       const savedMode = localStorage.getItem('qllh_view_mode');
       if (savedMode === 'teacher' || savedMode === 'portal') return savedMode;
-      const savedUser = localStorage.getItem('qllh_logged_user');
-      if (savedUser) {
-        const parsed = JSON.parse(savedUser);
-        if (parsed && (parsed.role === 'admin' || parsed.role === 'teacher')) {
-          return 'teacher';
-        }
-      }
     } catch {}
-    return 'teacher';
+    return 'portal';
   });
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
     try {
@@ -72,30 +73,36 @@ export default function App() {
 
 
   // Accounts & RBAC Authentication State
-  const [accounts, setAccounts] = useState<UserAccount[]>(() => {
-    const saved = localStorage.getItem('qllh_user_accounts');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
-    }
-    return INITIAL_ACCOUNTS;
-  });
+  const [accounts, setAccounts] = useState<UserAccount[]>([]);
 
-  const [currentUser, setCurrentUser] = useState<UserAccount>(() => {
-    try {
-      const savedUser = localStorage.getItem('qllh_logged_user');
-      if (savedUser) {
-        const parsed = JSON.parse(savedUser);
-        if (parsed && parsed.id && parsed.username) return parsed;
-      }
-    } catch {}
-    return accounts.find((a) => a.role === 'admin') || INITIAL_ACCOUNTS[0];
-  });
+  // currentUser chỉ được set thật sau khi xác nhận có phiên đăng nhập Supabase hợp lệ
+  // (xem useEffect khôi phục phiên bên dưới). Mặc định luôn là Khách (chưa đăng nhập).
+  const [currentUser, setCurrentUser] = useState<UserAccount>(GUEST_ACCOUNT);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
-  const teacherName = currentUser?.fullName || 'Thầy Trần Trung Kiên';
+  // Khôi phục phiên đăng nhập thật khi vừa mở trang (không tin localStorage, luôn hỏi lại Supabase)
+  useEffect(() => {
+    let isMounted = true;
+    restoreSession()
+      .then((profile) => {
+        if (!isMounted) return;
+        if (profile) {
+          setCurrentUser(profile);
+          setViewMode('teacher');
+        } else {
+          setCurrentUser(GUEST_ACCOUNT);
+          setViewMode('portal');
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsAuthChecking(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const teacherName = currentUser?.fullName || 'Thầy giáo viên';
 
   const [permissions, setPermissions] = useState<StudentPermissions>(() => {
     const saved = localStorage.getItem('qllh_student_permissions');
@@ -132,12 +139,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('qllh_logged_user', JSON.stringify(currentUser));
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
     localStorage.setItem('qllh_view_mode', viewMode);
   }, [viewMode]);
 
@@ -147,7 +148,6 @@ export default function App() {
 
   const [isCloudConnected, setIsCloudConnected] = useState(true);
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
-  const [isInitialHydrating, setIsInitialHydrating] = useState(false);
 
   const [syncToast, setSyncToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
     show: false,
@@ -354,24 +354,17 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    const defaultStudent: UserAccount = accounts.find((a) => a.role === 'student') || {
-      id: 'student_default',
-      username: 'hocsinh',
-      fullName: 'Học sinh',
-      role: 'student',
-      status: 'active',
-      createdAt: '2026-09-01',
-    };
-    localStorage.removeItem('qllh_logged_user');
-    localStorage.setItem('qllh_view_mode', 'portal');
-    setCurrentUser(defaultStudent);
-    setViewMode('portal');
-    setIsLoginModalOpen(true);
-    setIsMobileSidebarOpen(false);
+    signOut().finally(() => {
+      localStorage.setItem('qllh_view_mode', 'portal');
+      setCurrentUser(GUEST_ACCOUNT);
+      setViewMode('portal');
+      setIsLoginModalOpen(true);
+      setIsMobileSidebarOpen(false);
+    });
   };
 
-  // Màn hình tải đồng bộ CSDL đám mây siêu tốc khi vừa mở trang web (ngăn chặn chớp dữ liệu cũ)
-  if (isInitialHydrating) {
+  // Màn hình chờ trong lúc kiểm tra phiên đăng nhập thật với Supabase (tránh lộ giao diện Admin trước khi xác thực xong)
+  if (isAuthChecking) {
     return (
       <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex flex-col items-center justify-center p-6 antialiased">
         <div className="bg-white p-8 sm:p-10 rounded-3xl shadow-xl border border-blue-100 flex flex-col items-center max-w-sm w-full text-center">
@@ -380,10 +373,10 @@ export default function App() {
           </div>
           <h2 className="text-xl font-black text-slate-800 tracking-tight mb-1">QLLH.Pro</h2>
           <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full mb-3 inline-block">
-            Đồng bộ CSDL Đám mây
+            Đang kiểm tra đăng nhập
           </span>
           <p className="text-xs text-slate-500 leading-relaxed font-medium">
-            Đang tự động tải dữ liệu lớp học mới nhất từ đám mây Firestore để đồng nhất mọi máy tính...
+            Đang xác thực phiên đăng nhập với máy chủ Supabase...
           </p>
           <div className="w-full bg-slate-100 h-2 rounded-full mt-5 overflow-hidden">
             <div className="bg-gradient-to-r from-blue-500 via-indigo-600 to-sky-500 h-full rounded-full animate-pulse w-full" />

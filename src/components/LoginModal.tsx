@@ -20,7 +20,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   onLoginSuccess,
 }) => {
   const [loginMode, setLoginMode] = useState<'admin' | 'teacher'>('admin');
-  const [username, setUsername] = useState('trungkienkd2025');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -53,15 +53,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
   };
 
-  const handleQuickSwitchTo = (account: UserAccount) => {
-    onLoginSuccess(account);
-    onClose();
-    soundManager.playStarSound();
-  };
-
   const adminAcc = accounts.find((a) => a.role === 'admin') || accounts[0];
   const teacherAcc = accounts.find((a) => a.role === 'teacher');
-  const sampleStudentAcc = accounts.find((a) => a.role === 'student');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
@@ -112,7 +105,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               type="button"
               onClick={() => {
                 setLoginMode('admin');
-                setUsername(adminAcc.username);
+                setUsername(adminAcc?.username || '');
                 setPassword('');
                 setErrorMessage('');
               }}
@@ -126,7 +119,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               type="button"
               onClick={() => {
                 setLoginMode('teacher');
-                setUsername(teacherAcc?.username || 'giaovien01');
+                setUsername(teacherAcc?.username || '');
                 setPassword('');
                 setErrorMessage('');
               }}
@@ -165,7 +158,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">
-              Mật khẩu {loginMode === 'teacher' ? '(Mặc định: 123)' : '(Mặc định: 123)'}
+              Mật khẩu
             </label>
             <div className="relative">
               <Key className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -187,34 +180,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             Đăng nhập ngay
           </button>
 
-          {/* Quick 1-click test switcher for teacher convenience */}
-          <div className="pt-2 border-t border-slate-100 space-y-2">
+          <div className="pt-2 border-t border-slate-100">
             <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-200 text-[11px] text-emerald-800 flex items-center gap-1.5 leading-snug">
               <span>🔒</span>
               <span><strong>CSDL độc lập:</strong> Mỗi tài khoản có danh sách lớp và học sinh riêng biệt, thêm hoặc xóa không ảnh hưởng đến tài khoản khác.</span>
-            </div>
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block text-center">
-              Chuyển nhanh tài khoản để kiểm tra:
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickSwitchTo(adminAcc)}
-                className="py-1.5 px-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-[11px] font-semibold transition-colors truncate text-center"
-                title="Quản trị viên Thầy Kiên"
-              >
-                Thầy Kiên (Admin)
-              </button>
-              {teacherAcc ? (
-                <button
-                  type="button"
-                  onClick={() => handleQuickSwitchTo(teacherAcc)}
-                  className="py-1.5 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-[11px] font-semibold transition-colors truncate text-center"
-                  title="Tài khoản Giáo viên"
-                >
-                  Cô Hà (Giáo viên)
-                </button>
-              ) : null}
             </div>
           </div>
         </form>

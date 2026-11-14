@@ -92,6 +92,38 @@ export async function signOut(): Promise<void> {
 }
 
 /**
+ * Khôi phục phiên đăng nhập thật (nếu có) khi tải lại trang.
+ * Trả về null nếu chưa đăng nhập, hoặc đang đăng nhập ẩn danh (học sinh).
+ */
+export async function restoreSession(): Promise<UserAccount | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (!session?.user || session.user.is_anonymous) {
+    return null;
+  }
+
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('id, email, full_name, role, avatar')
+    .eq('id', session.user.id)
+    .single();
+
+  if (error || !profile || (profile.role !== 'admin' && profile.role !== 'teacher')) {
+    return null;
+  }
+
+  return {
+    id: profile.id,
+    username: profile.email || session.user.email || '',
+    fullName: profile.full_name || 'Người dùng',
+    role: profile.role,
+    status: 'active',
+    avatar: profile.avatar || undefined,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
  * Lấy vai trò phiên hiện tại
  */
 export async function getCurrentSession(): Promise<{ role: 'admin' | 'teacher' | 'student' | null }> {
