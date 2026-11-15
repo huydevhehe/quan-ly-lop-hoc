@@ -83,6 +83,7 @@ export interface GradeRecord {
 
 // Màu nhận diện riêng cho từng khối lớp (1-5) để các thẻ lớp dễ phân biệt
 const GRADE_ACCENT_COLORS: Record<number, {
+  cardBg: string;
   border: string;
   badgeBg: string;
   badgeText: string;
@@ -90,11 +91,11 @@ const GRADE_ACCENT_COLORS: Record<number, {
   button: string;
   buttonHover: string;
 }> = {
-  1: { border: 'border-sky-200', badgeBg: 'bg-sky-50', badgeText: 'text-sky-700', iconText: 'text-sky-600', button: 'bg-sky-500', buttonHover: 'hover:bg-sky-600' },
-  2: { border: 'border-emerald-200', badgeBg: 'bg-emerald-50', badgeText: 'text-emerald-700', iconText: 'text-emerald-600', button: 'bg-emerald-500', buttonHover: 'hover:bg-emerald-600' },
-  3: { border: 'border-amber-200', badgeBg: 'bg-amber-50', badgeText: 'text-amber-700', iconText: 'text-amber-600', button: 'bg-amber-500', buttonHover: 'hover:bg-amber-600' },
-  4: { border: 'border-violet-200', badgeBg: 'bg-violet-50', badgeText: 'text-violet-700', iconText: 'text-violet-600', button: 'bg-violet-500', buttonHover: 'hover:bg-violet-600' },
-  5: { border: 'border-rose-200', badgeBg: 'bg-rose-50', badgeText: 'text-rose-700', iconText: 'text-rose-600', button: 'bg-rose-500', buttonHover: 'hover:bg-rose-600' },
+  1: { cardBg: 'bg-sky-50/70', border: 'border-sky-200', badgeBg: 'bg-sky-100', badgeText: 'text-sky-700', iconText: 'text-sky-600', button: 'bg-sky-500', buttonHover: 'hover:bg-sky-600' },
+  2: { cardBg: 'bg-emerald-50/70', border: 'border-emerald-200', badgeBg: 'bg-emerald-100', badgeText: 'text-emerald-700', iconText: 'text-emerald-600', button: 'bg-emerald-500', buttonHover: 'hover:bg-emerald-600' },
+  3: { cardBg: 'bg-amber-50/70', border: 'border-amber-200', badgeBg: 'bg-amber-100', badgeText: 'text-amber-700', iconText: 'text-amber-600', button: 'bg-amber-500', buttonHover: 'hover:bg-amber-600' },
+  4: { cardBg: 'bg-violet-50/70', border: 'border-violet-200', badgeBg: 'bg-violet-100', badgeText: 'text-violet-700', iconText: 'text-violet-600', button: 'bg-violet-500', buttonHover: 'hover:bg-violet-600' },
+  5: { cardBg: 'bg-rose-50/70', border: 'border-rose-200', badgeBg: 'bg-rose-100', badgeText: 'text-rose-700', iconText: 'text-rose-600', button: 'bg-rose-500', buttonHover: 'hover:bg-rose-600' },
 };
 
 function getGradeAccentColor(gradeLabel: string) {
@@ -1798,7 +1799,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 return (
                   <div
                     key={cls.id}
-                    className={`bg-white border-2 ${gradeColor.border} rounded-2xl p-5 shadow-2xs hover:shadow-md transition-all relative group`}
+                    className={`${gradeColor.cardBg} border-2 ${gradeColor.border} rounded-2xl p-5 shadow-2xs hover:shadow-md transition-all relative group`}
                   >
                     {canManage && (
                       <div className="absolute top-4 right-4 flex gap-1.5 transition-opacity">
@@ -1839,11 +1840,14 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between mt-4">
-                      <p className="text-sm font-medium text-slate-600 bg-white/80 border border-slate-200/60 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                        <Users className={`w-3.5 h-3.5 ${gradeColor.iconText}`} />
-                        <span>{hsCount} HS</span>
-                      </p>
+                    <div className="flex items-center gap-2 mt-3 text-xs font-semibold text-slate-500">
+                      <Users className={`w-3.5 h-3.5 ${gradeColor.iconText}`} />
+                      <span>{hsCount} học sinh</span>
+                      <span className="text-slate-300">·</span>
+                      <span>Tuần {currentWeek}/35</span>
+                    </div>
+
+                    <div className="flex items-center justify-end mt-3">
                       <button
                         onClick={() => handleOpenClassDetail(cls.id)}
                         className={`text-sm font-bold text-white ${gradeColor.button} px-4 py-2 rounded-lg ${gradeColor.buttonHover} transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95`}
