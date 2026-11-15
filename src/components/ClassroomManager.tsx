@@ -621,12 +621,16 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     });
   }, [allSchoolYears, normalizedClasses]);
 
-  // Tổng số học sinh của các lớp thuộc tài khoản này
+  // Tổng số học sinh của các lớp thuộc năm học đang chọn. Dùng trực tiếp `totalStudents`
+  // (đếm thật từ server cho từng lớp) thay vì lọc `studentsData`, vì `studentsData` chỉ
+  // chứa học sinh của 1 lớp đang mở tại 1 thời điểm (tải lazy theo từng lớp) — lọc theo nó
+  // sẽ cho ra tổng sai khi đang đứng ở màn danh sách lớp (chưa mở lớp nào).
   const currentYearStudentsCount = useMemo(() => {
-    return studentsData.filter((s: StudentRecord) =>
-      visibleClassesInCurrentYear.some((c: ClassItem) => c.id === s.classId)
-    ).length;
-  }, [studentsData, visibleClassesInCurrentYear]);
+    return visibleClassesInCurrentYear.reduce(
+      (sum: number, c: ClassItem) => sum + (c.totalStudents || 0),
+      0
+    );
+  }, [visibleClassesInCurrentYear]);
 
   const currentClass = useMemo(() => {
     return (
