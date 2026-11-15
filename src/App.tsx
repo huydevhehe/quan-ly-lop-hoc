@@ -200,6 +200,17 @@ export default function App() {
     return () => window.removeEventListener('qllh_data_updated', loadClasses);
   }, [currentUser?.id]);
 
+  // Tải danh sách học sinh thật của lớp đang chọn (dùng cho Gọi tên ngẫu nhiên, Chia nhóm...)
+  useEffect(() => {
+    if (!selectedClassId) {
+      setStudents([]);
+      return;
+    }
+    listStudentsByClass(selectedClassId)
+      .then(setStudents)
+      .catch((err) => console.error('Lỗi tải danh sách học sinh trong App:', err));
+  }, [selectedClassId]);
+
   // Lắng nghe cập nhật phân quyền từ các component con và đám mây
   useEffect(() => {
     const handleGlobalDataSync = (e: any) => {
