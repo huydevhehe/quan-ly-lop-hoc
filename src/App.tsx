@@ -461,44 +461,6 @@ export default function App() {
         {/* Main Content Area */}
         <main className="flex-1 lg:pl-[260px] p-4 sm:p-6 lg:p-10 transition-all flex flex-col justify-between">
           <div className="w-full">
-            {/* Quick banner with Cloud & Backup Status */}
-            <div className="mb-4 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white px-4 py-2.5 rounded-2xl shadow-xs flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs">
-                <span className="font-bold bg-white/20 px-2 py-0.5 rounded-md uppercase tracking-wider text-[11px]">
-                  Mã lớp: {roomCode}
-                </span>
-                <span className="hidden md:inline">
-                  Học sinh truy cập trang web và nhập mã <strong>{roomCode}</strong>.
-                </span>
-                <button
-                  type="button"
-                  onClick={handleManualSyncCloud}
-                  disabled={isSyncingCloud}
-                  className="inline-flex items-center gap-1.5 bg-emerald-500/30 hover:bg-emerald-500/50 text-emerald-100 text-[11px] font-bold px-2.5 py-1 rounded-md border border-emerald-400/40 cursor-pointer transition active:scale-95 disabled:opacity-60"
-                  title="Bấm để đồng bộ dữ liệu ngay lập tức với đám mây Supabase"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin' : ''}`} />
-                  <span>{isSyncingCloud ? 'Đang đồng bộ...' : '☁️ CSDL Đám mây: Đồng bộ mọi máy'}</span>
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsBackupModalOpen(true)}
-                  className="px-3 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-bold rounded-xl transition-all shadow-2xs shrink-0 cursor-pointer flex items-center gap-1.5 border border-white/25 active:scale-95"
-                  title="Sao lưu toàn bộ học sinh, điểm số ra file .json hoặc đám mây"
-                >
-                  <span>💾 Sao lưu & Bảo vệ CSDL</span>
-                </button>
-                <button
-                  onClick={() => setViewMode('portal')}
-                  className="px-3 py-1 bg-white text-blue-700 hover:bg-blue-50 text-xs font-bold rounded-xl transition-all shadow-2xs shrink-0 cursor-pointer"
-                >
-                  👁️ Xem Cổng Học sinh
-                </button>
-              </div>
-            </div>
-
             {activeTab === 'home' && (
               <HomeDashboard
                 onSelectTab={(tab) => {
