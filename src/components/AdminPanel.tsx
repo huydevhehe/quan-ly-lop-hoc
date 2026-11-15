@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { Classroom, Student, StudentPermissions, UserAccount, UserRole } from '../types';
 import { adminService } from '../services/adminService';
+import { listMyClasses } from '../services/classesService';
 import { studentPermissionsService } from '../services/studentPermissionsService';
 import { soundManager } from '../utils/audio';
 
@@ -50,7 +51,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   students,
   currentUserId,
 }) => {
-  const [activeTab, setActiveTab] = useState<'permissions' | 'accounts' | 'security'>('permissions');
+  const [activeTab, setActiveTab] = useState<'permissions' | 'accounts' | 'assignments' | 'security'>('permissions');
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
 
@@ -67,6 +68,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
     }).catch(() => {});
   }, []);
+
+  // Phân công lớp cho giáo viên: danh sách lớp thật (có created_by) để gán chủ sở hữu lớp.
+  const [assignClasses, setAssignClasses] = useState<Classroom[]>([]);
+  const [isAssigningClassId, setIsAssigningClassId] = useState<string | null>(null);
+
+  const refreshAssignClasses = async () => {
+    try {
+      const data = await listMyClasses();
+      setAssignClasses(data);
+    } catch (err) {
+      console.error('Lỗi tải danh sách lớp để phân công:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'assignments') {
+      refreshAssignClasses();
+    }
+  }, [activeTab]);
+
+  const handleAssignTeacher = async (classId: string, teacherId: string) => {
+    if (!teacherId) return;
+    setIsAssigningClassId(classId);
+    try {
+      await adminService.assignTeacherToClass(classId, teacherId);
+      await refreshAssignClasses();
+      soundManager.playStarSound();
+    } catch (err: any) {
+      alert(`Không thể gán giáo viên cho lớp: ${err.message || 'Lỗi không xác định'}`);
+    } finally {
+      setIsAssigningClassId(null);
+    }
+  };
 
   // New account form
   const [newUsername, setNewUsername] = useState('');
@@ -276,6 +310,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             }`}
           >
             Quản lý tài khoản ({accounts.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('assignments')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              activeTab === 'assignments' ? 'bg-white text-emerald-600 shadow-2xs font-bold' : 'text-slate-600'
+            }`}
+          >
+            Phân công lớp
           </button>
           <button
             onClick={() => setActiveTab('security')}
@@ -563,6 +605,93 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: PHÂN CÔNG LỚP CHO GIÁO VIÊN */}
+      {activeTab === 'assignments' && (
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-2xs space-y-6">
+          <div>
+            <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">
+              PHÂN CÔNG LỚP HỌC
+            </span>
+            <h3 className="text-xl font-bold text-slate-900 mt-1">
+              Gán giáo viên phụ trách cho từng lớp
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Giáo viên được gán sẽ có toàn quyền quản lý đúng lớp đó (học sinh, điểm, điểm danh,
+              trắc nghiệm...) — không được đụng tới các lớp khác hay các chức năng quản trị. Một giáo
+              viên có thể được gán nhiều lớp khác nhau.
+            </p>
+          </div>
+
+          <div className="border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
+                    <th className="py-3 px-4">Lớp</th>
+                    <th className="py-3 px-4">Khối</th>
+                    <th className="py-3 px-4">Năm học</th>
+                    <th className="py-3 px-4">Giáo viên phụ trách hiện tại</th>
+                    <th className="py-3 px-4">Gán cho giáo viên khác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {assignClasses.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-6 px-4 text-center text-slate-400">
+                        Chưa có lớp học nào.
+                      </td>
+                    </tr>
+                  ) : (
+                    assignClasses.map((cls) => {
+                      const owner = accounts.find((a) => a.id === cls.createdBy);
+                      return (
+                        <tr key={cls.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-3.5 px-4 font-bold text-slate-800">{cls.name}</td>
+                          <td className="py-3.5 px-4 text-slate-600">Khối {cls.grade}</td>
+                          <td className="py-3.5 px-4 text-slate-600">{cls.academicYear}</td>
+                          <td className="py-3.5 px-4">
+                            {owner ? (
+                              <span className="font-semibold text-slate-800">
+                                {owner.fullName} <span className="text-slate-400 font-normal">({owner.username})</span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 italic">Chưa rõ / tài khoản đã xóa</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <select
+                              defaultValue=""
+                              disabled={isAssigningClassId === cls.id}
+                              onChange={(e) => {
+                                const teacherId = e.target.value;
+                                e.target.value = '';
+                                if (teacherId) handleAssignTeacher(cls.id, teacherId);
+                              }}
+                              className="px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white disabled:opacity-50"
+                            >
+                              <option value="" disabled>
+                                {isAssigningClassId === cls.id ? 'Đang gán...' : '-- Chọn giáo viên --'}
+                              </option>
+                              {accounts
+                                .filter((a) => a.id !== cls.createdBy)
+                                .map((a) => (
+                                  <option key={a.id} value={a.id}>
+                                    {a.fullName} ({a.username})
+                                  </option>
+                                ))}
+                            </select>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>

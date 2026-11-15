@@ -65,6 +65,7 @@ export async function listMyClasses(): Promise<Classroom[]> {
       academicYear: yearName || 'Chưa gán năm học',
       totalStudents: studentCount,
       roomCode: c.room_code,
+      createdBy: c.created_by || undefined,
     };
   });
 }
