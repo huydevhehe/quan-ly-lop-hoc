@@ -20,7 +20,6 @@ import { DataBackupModal } from './components/DataBackupModal';
 import {
   INITIAL_CLASSROOMS,
   INITIAL_STUDENTS,
-  INITIAL_QUIZZES,
   INITIAL_RESOURCES,
   INITIAL_PERMISSIONS,
 } from './data/mockData';
@@ -28,7 +27,6 @@ import {
   ActiveTab,
   Classroom,
   DigitalResource,
-  QuizQuestion,
   Student,
   StudentPermissions,
   UserAccount,
@@ -204,21 +202,6 @@ export default function App() {
     return () => window.removeEventListener('qllh_data_updated', loadClasses);
   }, [currentUser?.id]);
 
-  const [quizzes, setQuizzes] = useState<QuizQuestion[]>(() => {
-    try {
-      const saved = localStorage.getItem('qllh_quiz_bank');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_QUIZZES;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('qllh_quiz_bank', JSON.stringify(quizzes));
-  }, [quizzes]);
-
   const [resources, setResources] = useState<DigitalResource[]>(() => {
     try {
       const saved = localStorage.getItem('qllh_digital_resources');
@@ -239,9 +222,6 @@ export default function App() {
     const handleGlobalDataSync = (e: any) => {
       const d = e?.detail?.data;
       if (d) {
-        if (d.quizBank && Array.isArray(d.quizBank) && d.quizBank.length > 0) {
-          setQuizzes((prev) => (JSON.stringify(prev) === JSON.stringify(d.quizBank) ? prev : d.quizBank));
-        }
         if (d.resources && Array.isArray(d.resources) && d.resources.length > 0) {
           setResources((prev) => (JSON.stringify(prev) === JSON.stringify(d.resources) ? prev : d.resources));
         }
@@ -570,7 +550,7 @@ export default function App() {
             )}
 
             {activeTab === 'quiz' && (
-              <QuizBank quizzes={quizzes} setQuizzes={setQuizzes} isAdmin={isAdmin || currentUser?.role === 'teacher'} />
+              <QuizBank isAdmin={isAdmin || currentUser?.role === 'teacher'} />
             )}
 
             {activeTab === 'resources' && (

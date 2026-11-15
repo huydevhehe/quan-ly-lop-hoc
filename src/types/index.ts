@@ -26,6 +26,7 @@ export interface QuizQuestion {
   grade: number;
   subject: string;
   topic: string;
+  topicName?: string;
   question: string;
   options: string[];
   correctIndex: number;

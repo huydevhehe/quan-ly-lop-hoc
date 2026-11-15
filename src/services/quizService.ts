@@ -214,6 +214,35 @@ export async function setTopicActive(topicId: string, isActive: boolean): Promis
 }
 
 /**
+ * Lấy toàn bộ câu hỏi trong ngân hàng (mọi chủ đề, dành cho Giáo viên quản lý, có correctIndex)
+ */
+export async function listAllQuestions(): Promise<QuizQuestion[]> {
+  const { data, error } = await supabase
+    .from('quiz_questions')
+    .select('id, topic_id, content, options, correct_index, image_url, quiz_topics (name, grade)')
+    .order('id', { ascending: false });
+
+  if (error) {
+    throw new Error(`Lỗi khi lấy ngân hàng câu hỏi: ${error.message}`);
+  }
+
+  return (data || []).map((q: any) => {
+    const topicInfo = Array.isArray(q.quiz_topics) ? q.quiz_topics[0] : q.quiz_topics;
+    return {
+      id: q.id,
+      grade: topicInfo?.grade || 1,
+      subject: 'Tin học',
+      topic: q.topic_id,
+      topicName: topicInfo?.name || 'Chưa rõ chủ đề',
+      question: q.content,
+      options: Array.isArray(q.options) ? q.options : [],
+      correctIndex: q.correct_index,
+      explanation: '',
+    };
+  });
+}
+
+/**
  * Lấy danh sách câu hỏi theo chủ đề (dành cho Giáo viên, có correctIndex)
  */
 export async function listQuestionsByTopic(topicId: string): Promise<QuizQuestion[]> {

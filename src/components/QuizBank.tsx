@@ -30,7 +30,7 @@ import { soundManager } from '../utils/audio';
 import { INITIAL_SUBMISSIONS } from '../data/mockData';
 import {
   listTopics,
-  listQuestionsByTopic,
+  listAllQuestions,
   createQuestion,
   deleteQuestion,
   listExamResults,
@@ -38,16 +38,32 @@ import {
   generateSampleExcelTemplate,
   parseQuestionsExcelFile,
   bulkInsertQuestions,
+  QuizTopicItem,
 } from '../services/quizService';
 import { QuizTopicActivationPanel } from './QuizTopicActivationPanel';
 
 interface QuizBankProps {
-  quizzes: QuizQuestion[];
-  setQuizzes: React.Dispatch<React.SetStateAction<QuizQuestion[]>>;
   isAdmin?: boolean;
 }
 
-export const QuizBank: React.FC<QuizBankProps> = ({ quizzes, setQuizzes, isAdmin = true }) => {
+export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
+  // Ngân hàng câu hỏi thật (từ Supabase quiz_questions/quiz_topics), không còn dùng localStorage
+  const [quizzes, setQuizzes] = useState<QuizQuestion[]>([]);
+  const [allTopics, setAllTopics] = useState<QuizTopicItem[]>([]);
+
+  const refreshQuestionBank = async () => {
+    try {
+      const [topics, questions] = await Promise.all([listTopics(), listAllQuestions()]);
+      setAllTopics(topics);
+      setQuizzes(questions);
+    } catch (err: any) {
+      console.error('Lỗi tải ngân hàng câu hỏi:', err);
+    }
+  };
+
+  useEffect(() => {
+    refreshQuestionBank();
+  }, []);
   // Main sub-tabs in QuizBank: 'bank' (Ngân hàng câu hỏi) or 'scores' (Bảng điểm học sinh)
   const [activeSubTab, setActiveSubTab] = useState<'bank' | 'scores'>('bank');
 
@@ -209,37 +225,46 @@ export const QuizBank: React.FC<QuizBankProps> = ({ quizzes, setQuizzes, isAdmin
     }
   };
 
-  const handleAddQuestionSubmit = (e: React.FormEvent) => {
+  const handleAddQuestionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newQuestion.trim()) return;
 
-    const created: QuizQuestion = {
-      id: `q_${Date.now()}`,
-      grade: newGrade,
-      subject: 'Tin học',
-      topic: newTopic,
-      question: newQuestion.trim(),
-      options: newOptions.map((opt, i) => opt.trim() || `Đáp án ${String.fromCharCode(65 + i)}`),
-      correctIndex: newCorrectIndex,
-      explanation: newExplanation.trim() || 'Chúc mừng các em đã trả lời chính xác!'
-    };
+    try {
+      const topicName = newTopic.trim() || 'Chủ đề chung';
+      let topicId = allTopics.find((t) => t.grade === newGrade && t.name === topicName)?.id;
+      if (!topicId) {
+        topicId = await createTopic(newGrade, topicName);
+      }
 
-    const updated = [created, ...quizzes];
-    setQuizzes(updated);
-    localStorage.setItem('qllh_quiz_bank', JSON.stringify(updated));
-    setShowAddModal(false);
-    setNewQuestion('');
-    setNewOptions(['', '', '', '']);
-    setNewExplanation('');
-    soundManager.playFanfare();
+      await createQuestion({
+        grade: newGrade,
+        subject: 'Tin học',
+        topic: topicId,
+        question: newQuestion.trim(),
+        options: newOptions.map((opt, i) => opt.trim() || `Đáp án ${String.fromCharCode(65 + i)}`),
+        correctIndex: newCorrectIndex,
+        explanation: newExplanation.trim() || 'Chúc mừng các em đã trả lời chính xác!',
+      });
+
+      await refreshQuestionBank();
+      setShowAddModal(false);
+      setNewQuestion('');
+      setNewOptions(['', '', '', '']);
+      setNewExplanation('');
+      soundManager.playFanfare();
+    } catch (err: any) {
+      alert(`Không thể thêm câu hỏi: ${err.message || 'Lỗi không xác định'}`);
+    }
   };
 
-  const handleDeleteQuestion = (id: string) => {
-    if (confirm('Thầy có chắc chắn muốn xóa câu hỏi này không?')) {
-      const updated = quizzes.filter((q) => q.id !== id);
-      setQuizzes(updated);
-      localStorage.setItem('qllh_quiz_bank', JSON.stringify(updated));
+  const handleDeleteQuestion = async (id: string) => {
+    if (!confirm('Thầy có chắc chắn muốn xóa câu hỏi này không?')) return;
+    try {
+      await deleteQuestion(id);
+      await refreshQuestionBank();
       soundManager.playTick();
+    } catch (err: any) {
+      alert(`Không thể xóa câu hỏi: ${err.message || 'Lỗi không xác định'}`);
     }
   };
 
@@ -308,8 +333,7 @@ export const QuizBank: React.FC<QuizBankProps> = ({ quizzes, setQuizzes, isAdmin
 
       await bulkInsertQuestions(targetTopicId, parsed.rows);
       alert(`Nhập thành công ${parsed.rows.length} câu hỏi!`);
-      const updatedQs = await listQuestionsByTopic(targetTopicId);
-      setQuizzes((prev) => [...prev, ...updatedQs]);
+      await refreshQuestionBank();
     } catch (err: any) {
       alert(`Lỗi khi nhập Excel: ${err.message}`);
     } finally {
@@ -512,7 +536,7 @@ export const QuizBank: React.FC<QuizBankProps> = ({ quizzes, setQuizzes, isAdmin
                       <span className="font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg">
                         Khối {quiz.grade}
                       </span>
-                      <span className="truncate max-w-[200px] text-slate-500">{quiz.topic}</span>
+                      <span className="truncate max-w-[200px] text-slate-500">{quiz.topicName || quiz.topic}</span>
                     </div>
 
                     <h4 className="font-bold text-slate-900 text-sm leading-snug">
@@ -831,7 +855,7 @@ export const QuizBank: React.FC<QuizBankProps> = ({ quizzes, setQuizzes, isAdmin
             <div className="p-8 overflow-y-auto space-y-6 flex-1">
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
-                  {activeQuestion.topic}
+                  {activeQuestion.topicName || activeQuestion.topic}
                 </span>
                 <h3 className="text-2xl font-black text-slate-900 mt-2 leading-relaxed">
                   {activeQuestion.question}
