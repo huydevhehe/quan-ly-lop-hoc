@@ -70,7 +70,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // New account form
   const [newUsername, setNewUsername] = useState('');
-  const [newPassword, setNewPassword] = useState('123');
+  const [newPassword, setNewPassword] = useState('123456');
   const [newFullName, setNewFullName] = useState('');
   const [newRole, setNewRole] = useState<UserRole>('teacher');
 
@@ -160,8 +160,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       });
 
       if (editPassword.trim()) {
-        if (editPassword.trim().length < 3) {
-          alert('Mật khẩu mới phải có ít nhất 3 ký tự!');
+        if (editPassword.trim().length < 6) {
+          alert('Mật khẩu mới phải có ít nhất 6 ký tự!');
           return;
         }
         const pwdResult = await adminService.resetStaffPassword(editingAccount.id, editPassword.trim());
@@ -188,8 +188,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return;
     }
 
-    const email = newUsername.includes('@') ? newUsername.trim() : `${newUsername.trim().toLowerCase()}@qllh.edu.vn`;
     const pwd = newPassword.trim() || '123456';
+    if (pwd.length < 6) {
+      alert('Mật khẩu phải có ít nhất 6 ký tự!');
+      return;
+    }
+
+    const email = newUsername.includes('@') ? newUsername.trim() : `${newUsername.trim().toLowerCase()}@qllh.edu.vn`;
     const result = await adminService.createStaffAccount(email, pwd, newFullName.trim(), newRole === 'admin' ? 'admin' : 'teacher');
 
     if ('error' in result) {
@@ -201,7 +206,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setShowAddAccountModal(false);
     setNewUsername('');
     setNewFullName('');
-    setNewPassword('123');
+    setNewPassword('123456');
     soundManager.playStarSound();
   };
 
@@ -211,8 +216,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const myAccount = accounts.find((a) => a.id === currentUserId);
     if (!myAccount) return;
 
-    if (adminNewPassword.length < 3) {
-      setPasswordChangeMsg({ text: 'Mật khẩu mới phải có ít nhất 3 ký tự!', type: 'error' });
+    if (adminNewPassword.length < 6) {
+      setPasswordChangeMsg({ text: 'Mật khẩu mới phải có ít nhất 6 ký tự!', type: 'error' });
       return;
     }
     if (adminNewPassword !== adminConfirmPassword) {
@@ -598,7 +603,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <form onSubmit={handleChangeAdminPassword} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Mật khẩu hiện tại (mặc định: 123)
+                Mật khẩu hiện tại
               </label>
               <input
                 type="password"
