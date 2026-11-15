@@ -55,9 +55,6 @@ interface ReportsSectionProps {
 }
 
 export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, currentUser }) => {
-  // Current academic year
-  const [currentYear, setCurrentYear] = useState<string>('2026-2027');
-
   // Classes list
   const [classesList, setClassesList] = useState<ClassItem[]>([]);
 
@@ -72,7 +69,7 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
       const cls = await listMyClasses();
       const mappedClasses: ClassItem[] = cls.map((c) => ({
         id: c.id,
-        year: c.academicYear || '2026-2027',
+        year: c.academicYear,
         name: c.name,
         grade: String(c.grade),
       }));
@@ -111,10 +108,8 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
   const [searchQuery, setSearchQuery] = useState('');
   const [showCommentsModal, setShowCommentsModal] = useState(false);
 
-  // Classes filtered by current year
-  const yearClasses = useMemo(() => {
-    return classesList.filter((c) => c.year === currentYear);
-  }, [classesList, currentYear]);
+  // Báo cáo hiển thị tất cả các lớp (không lọc theo năm học vì màn này không có bộ chọn năm học)
+  const yearClasses = classesList;
 
   // Tải điểm từ Supabase scoresService khi chọn lớp
   useEffect(() => {
@@ -395,7 +390,7 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
               </h2>
             </div>
             <p className="text-xs sm:text-sm text-slate-600 font-medium">
-              Năm học {currentYear?.replace('-', ' – ')} · Báo cáo điểm số, xếp loại và xuất bảng điểm Excel chuẩn
+              Báo cáo điểm số, xếp loại và xuất bảng điểm Excel chuẩn (tất cả các lớp)
             </p>
           </div>
 

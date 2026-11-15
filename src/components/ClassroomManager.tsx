@@ -27,6 +27,7 @@ import confetti from 'canvas-confetti';
 import { Student, UserAccount } from '../types';
 import { listMyClasses, createClass, updateClass, deleteClass } from '../services/classesService';
 import { listStudentsByClass, upsertStudents, deleteStudent } from '../services/studentsService';
+import { listSchoolYears, createSchoolYear } from '../services/schoolYearsService';
 import {
   getWeekAttendance,
   saveWeekAttendance,
@@ -107,9 +108,39 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   // Quyền quản lý: Quản trị viên HOẶC Giáo viên đều có đầy đủ chức năng quản lý lớp học, học sinh, điểm số, TKB
   const isRealAdmin = Boolean(isAdmin || currentUser?.role === 'admin');
   const canManage = Boolean(isRealAdmin || currentUser?.role === 'teacher');
-  // Years state theo tài khoản
-  const [yearsData, setYearsData] = useState<string[]>(['2025-2026', '2024-2025']);
-  const [currentYear, setCurrentYear] = useState<string>('2025-2026');
+  // Năm học: lấy thật từ bảng school_years trên server (không gán cứng nữa)
+  const [yearsData, setYearsData] = useState<string[]>([]);
+  const [yearNameToId, setYearNameToId] = useState<Record<string, string>>({});
+  const [currentYear, setCurrentYear] = useState<string>('');
+
+  const fetchSchoolYears = async (preferYear?: string) => {
+    try {
+      const years = await listSchoolYears();
+      if (years.length === 0) {
+        setYearsData([]);
+        setYearNameToId({});
+        return;
+      }
+      const nameToId: Record<string, string> = {};
+      years.forEach((y) => {
+        nameToId[y.name] = y.id;
+      });
+      setYearNameToId(nameToId);
+      setYearsData(years.map((y) => y.name));
+      setCurrentYear((prev) => {
+        if (preferYear && nameToId[preferYear]) return preferYear;
+        if (prev && nameToId[prev]) return prev;
+        const active = years.find((y) => y.isActive);
+        return active?.name || years[0].name;
+      });
+    } catch (err) {
+      console.error('Lỗi tải danh sách năm học:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchSchoolYears();
+  }, []);
 
   // Classes state (sử dụng Supabase classesService)
   const [classesData, setClassesData] = useState<ClassItem[]>([]);
@@ -136,7 +167,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       const res = await listMyClasses();
       const mapped: ClassItem[] = res.map((c) => ({
         id: c.id,
-        year: c.academicYear || '2025-2026',
+        year: c.academicYear,
         name: c.name,
         grade: `Khối ${c.grade}`,
         bg: 'bg-emerald-500',
@@ -144,6 +175,13 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
         createdByName: currentUser?.fullName || 'Giáo viên',
       }));
       setClassesData(mapped);
+      // Gộp thêm các năm học "mồ côi" (lớp cũ chưa gán năm học thật) để không bị mất khỏi danh sách tab
+      const classYears = Array.from(new Set(mapped.map((c) => c.year).filter(Boolean)));
+      setYearsData((prev) => {
+        const extra = classYears.filter((y) => !prev.includes(y));
+        return extra.length > 0 ? [...prev, ...extra] : prev;
+      });
+      setCurrentYear((prev) => prev || classYears[0] || '');
       if (mapped.length > 0) {
         if (!currentClassId) {
           setCurrentClassId(mapped[0].id);
@@ -689,6 +727,21 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     setShowClassModal(true);
   };
 
+  // Tìm school_year_id thật tương ứng với tên năm học đang chọn trên form; tự tạo năm học mới trên server nếu chưa có
+  const resolveSchoolYearId = async (yearName: string): Promise<string | undefined> => {
+    if (!yearName) return undefined;
+    if (yearNameToId[yearName]) return yearNameToId[yearName];
+    try {
+      const created = await createSchoolYear(yearName);
+      setYearNameToId((prev) => ({ ...prev, [created.name]: created.id }));
+      setYearsData((prev) => (prev.includes(created.name) ? prev : [...prev, created.name]));
+      return created.id;
+    } catch {
+      // Không tạo được năm học mới (ví dụ: tài khoản Giáo viên không có quyền) -> giữ lớp không gán năm học
+      return undefined;
+    }
+  };
+
   const handleSubmitClass = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = classFormName.trim().toUpperCase();
@@ -698,12 +751,15 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       return;
     }
 
+    const schoolYearId = await resolveSchoolYearId(classFormYear);
+
     if (isEditingClass && (editingClassId || currentClassId)) {
       const targetId = (editingClassId || currentClassId)!;
       try {
         await updateClass(targetId, {
           name,
           grade: Number(gradeVal),
+          schoolYearId,
         });
         await fetchClasses();
       } catch (err: any) {
@@ -715,6 +771,8 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
         const newClass = await createClass({
           name,
           grade: Number(gradeVal),
+          schoolYearId,
+          schoolYearName: classFormYear,
         });
         await fetchClasses();
         setCurrentClassId(newClass.id);
@@ -1314,22 +1372,30 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     XLSX.writeFile(workbook, fileName);
   };
 
-  // Action: Add Academic Year
-  const handleAddYear = () => {
+  // Action: Add Academic Year (tạo thật trên server, bảng school_years)
+  const handleAddYear = async () => {
     if (!newYearInput.trim()) return;
     const trimmed = newYearInput.trim();
-    if (!yearsData.includes(trimmed)) {
-      setYearsData((prev) => [...prev, trimmed]);
+    if (yearsData.includes(trimmed)) {
       setCurrentYear(trimmed);
-      localStorage.setItem('qllh_current_year', trimmed);
+      setNewYearInput('');
+      setShowAddYearModal(false);
+      return;
     }
-    setNewYearInput('');
-    setShowAddYearModal(false);
-    window.dispatchEvent(new Event('qllh_data_updated'));
+    try {
+      const created = await createSchoolYear(trimmed);
+      setYearNameToId((prev) => ({ ...prev, [created.name]: created.id }));
+      setYearsData((prev) => [...prev, created.name]);
+      setCurrentYear(created.name);
+      setNewYearInput('');
+      setShowAddYearModal(false);
+    } catch (err: any) {
+      alert(`Không thể tạo năm học mới: ${err.message || 'Có thể bạn không có quyền (chỉ Quản trị viên được tạo năm học mới)'}`);
+    }
   };
 
-  // Action: Delete Academic Year
-  const handleDeleteCurrentYear = (yearToDelete?: string) => {
+  // Action: Delete Academic Year - xóa thật toàn bộ lớp (và học sinh/điểm/điểm danh kèm theo) của năm học này trên server
+  const handleDeleteCurrentYear = async (yearToDelete?: string) => {
     const targetYear = yearToDelete || currentYear;
     if (yearsData.length <= 1) {
       alert('Không thể xóa năm học duy nhất! Vui lòng tạo thêm năm học khác trước khi xóa năm học này.');
@@ -1339,22 +1405,25 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     const confirmed = confirm(
       `Xác nhận xóa NĂM HỌC ${targetYear}?\n\n` +
       `- Số lớp trong năm học này: ${classesInYear.length} lớp\n` +
-      `- Toàn bộ lớp học, học sinh, điểm danh và bảng điểm thuộc năm học ${targetYear} sẽ bị xóa vĩnh viễn.\n\n` +
+      `- Toàn bộ lớp học, học sinh, điểm danh và bảng điểm thuộc năm học ${targetYear} sẽ bị xóa vĩnh viễn trên máy chủ.\n\n` +
       `Bạn có chắc chắn muốn xóa không?`
     );
     if (!confirmed) return;
 
-    const remainingClasses = classesData.filter((c) => c.year !== targetYear);
-    const remainingClassIds = new Set(remainingClasses.map((c) => c.id));
-    const nextStudents = studentsData.filter((s) => remainingClassIds.has(s.classId));
-    setClassesData(remainingClasses);
-    setStudentsData(nextStudents);
+    try {
+      await Promise.all(classesInYear.map((c) => deleteClass(c.id)));
+    } catch (err: any) {
+      alert(`Có lỗi khi xóa một số lớp: ${err.message || 'Lỗi không xác định'}. Vui lòng tải lại trang và thử lại.`);
+    }
 
-    const remainingYears = yearsData.filter((y) => y !== targetYear);
-    setYearsData(remainingYears);
+    await fetchClasses();
+    // Năm học thật (có trong school_years) vẫn giữ lại tab dù tạm thời trống lớp; chỉ bỏ tab "mồ côi" khi hết lớp
+    if (!yearNameToId[targetYear]) {
+      setYearsData((prev) => prev.filter((y) => y !== targetYear));
+    }
 
-    const nextYear = remainingYears[0];
-    setCurrentYear(nextYear);
+    const nextYear = yearsData.find((y) => y !== targetYear) || Object.keys(yearNameToId)[0];
+    setCurrentYear(nextYear || targetYear);
     setCurrentClassId('');
     if (onSelectClassExternal) onSelectClassExternal('');
     setCurrentView('list');

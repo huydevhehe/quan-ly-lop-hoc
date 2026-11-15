@@ -235,7 +235,7 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
         setClassesList(
           cls.map((c) => ({
             id: c.id,
-            year: c.academicYear || '2026-2027',
+            year: c.academicYear,
             name: c.name,
             grade: String(c.grade),
           }))
@@ -370,7 +370,7 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
         setClassesList(
           cls.map((c) => ({
             id: c.id,
-            year: c.academicYear || '2026-2027',
+            year: c.academicYear,
             name: c.name,
             grade: String(c.grade),
           }))

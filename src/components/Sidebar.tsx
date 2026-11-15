@@ -105,6 +105,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           const years = Array.from(new Set(mapped.map((c) => c.year)));
           if (years.length > 0) {
             setSidebarYears(years);
+            // Nếu năm học đang chọn không khớp năm nào có lớp thật, tự chuyển về năm thật đầu tiên
+            if (!years.includes(selectedYear)) {
+              setSelectedYear(years[0]);
+            }
           }
         })
         .catch(() => {});

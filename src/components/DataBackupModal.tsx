@@ -18,6 +18,7 @@ import {
 import confetti from 'canvas-confetti';
 import { soundManager } from '../utils/audio';
 import { listMyClasses, createClass } from '../services/classesService';
+import { listSchoolYears } from '../services/schoolYearsService';
 import { listStudentsByClass, upsertStudents } from '../services/studentsService';
 import { getClassScores, saveScore, Semester } from '../services/scoresService';
 import { getWeekAttendance, saveWeekAttendance, getWeekEvaluations, saveWeekEvaluation, AttendanceStatus } from '../services/attendanceService';
@@ -235,9 +236,13 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({ isOpen, onClos
 
   const loadCurrentStats = () => {
     try {
-      const cy = localStorage.getItem('qllh_current_year') || '2026-2027';
-      setCurrentYear(cy);
-      setYearsList(['2026-2027', '2025-2026']);
+      const cy = localStorage.getItem('qllh_current_year') || '';
+      listSchoolYears()
+        .then((years) => {
+          setYearsList(years.map((y) => y.name));
+          setCurrentYear(cy || years.find((y) => y.isActive)?.name || years[0]?.name || '');
+        })
+        .catch(() => {});
       listMyClasses()
         .then(async (cls) => {
           setClassesCount(cls.length);

@@ -67,7 +67,7 @@ export default function App() {
   });
   const [roomCode, setRoomCode] = useState('F08AF1');
   const [selectedYear, setSelectedYear] = useState(() => {
-    return localStorage.getItem('qllh_current_year') || '2026-2027';
+    return localStorage.getItem('qllh_current_year') || '';
   });
   const [targetSubTab, setTargetSubTab] = useState<'week' | 'student' | 'grade'>('week');
 

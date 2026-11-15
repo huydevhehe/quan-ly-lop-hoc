@@ -5,6 +5,7 @@ export interface CreateClassInput {
   name: string;
   grade: number;
   schoolYearId?: string;
+  schoolYearName?: string;
   roomCode?: string;
 }
 
@@ -12,6 +13,7 @@ export interface UpdateClassInput {
   name?: string;
   grade?: number;
   isOpen?: boolean;
+  schoolYearId?: string;
 }
 
 /**
@@ -41,7 +43,8 @@ export async function listMyClasses(): Promise<Classroom[]> {
       is_open,
       created_by,
       created_at,
-      students (count)
+      students (count),
+      school_years (name)
     `)
     .order('created_at', { ascending: false });
 
@@ -53,12 +56,13 @@ export async function listMyClasses(): Promise<Classroom[]> {
     const studentCount = Array.isArray(c.students) && c.students[0]?.count != null
       ? c.students[0].count
       : 0;
+    const yearName = Array.isArray(c.school_years) ? c.school_years[0]?.name : c.school_years?.name;
 
     return {
       id: c.id,
       name: c.name,
       grade: c.grade || 1,
-      academicYear: '2026-2027',
+      academicYear: yearName || 'Chưa gán năm học',
       totalStudents: studentCount,
       roomCode: c.room_code,
     };
@@ -91,7 +95,7 @@ export async function createClass(input: CreateClassInput): Promise<Classroom> {
     id: data.id,
     name: data.name,
     grade: data.grade || 1,
-    academicYear: '2026-2027',
+    academicYear: input.schoolYearName || 'Chưa gán năm học',
     totalStudents: 0,
     roomCode: data.room_code,
   };
@@ -105,6 +109,7 @@ export async function updateClass(id: string, patch: UpdateClassInput): Promise<
   if (patch.name !== undefined) updatePayload.name = patch.name.trim();
   if (patch.grade !== undefined) updatePayload.grade = patch.grade;
   if (patch.isOpen !== undefined) updatePayload.is_open = patch.isOpen;
+  if (patch.schoolYearId !== undefined) updatePayload.school_year_id = patch.schoolYearId;
 
   const { error } = await supabase
     .from('classes')
