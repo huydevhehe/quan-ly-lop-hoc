@@ -30,7 +30,6 @@ import { Classroom, Student, StudentPermissions, UserAccount, UserRole } from '.
 import { adminService } from '../services/adminService';
 import { studentPermissionsService } from '../services/studentPermissionsService';
 import { soundManager } from '../utils/audio';
-import confetti from 'canvas-confetti';
 
 interface AdminPanelProps {
   accounts: UserAccount[];
@@ -74,8 +73,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newPassword, setNewPassword] = useState('123');
   const [newFullName, setNewFullName] = useState('');
   const [newRole, setNewRole] = useState<UserRole>('teacher');
-  const [newClassId, setNewClassId] = useState('c1');
-  const [newMustChangePassword, setNewMustChangePassword] = useState(true);
 
   // Edit account state & form
   const [editingAccount, setEditingAccount] = useState<UserAccount | null>(null);
@@ -83,9 +80,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editFullName, setEditFullName] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [editRole, setEditRole] = useState<UserRole>('teacher');
-  const [editClassId, setEditClassId] = useState('c1');
-  const [editStatus, setEditStatus] = useState<'active' | 'locked'>('active');
-  const [editMustChangePassword, setEditMustChangePassword] = useState(false);
 
   // Change admin password state
   const [adminOldPassword, setAdminOldPassword] = useState('');
@@ -105,78 +99,82 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setTimeout(() => setSaveToast(false), 2000);
   };
 
-  const handleToggleAccountStatus = (id: string) => {
-    setAccounts((prev) => {
-      const updated: UserAccount[] = prev.map((acc) =>
-        acc.id === id ? { ...acc, status: acc.status === 'active' ? 'locked' : 'active' } : acc
-      );
-      localStorage.setItem('qllh_user_accounts', JSON.stringify(updated));
-      return updated;
-    });
+  const refreshStaffList = async () => {
+    try {
+      const staffList = await adminService.listStaff();
+      setAccounts(staffList);
+    } catch {}
   };
 
-  const handleDeleteAccount = (id: string) => {
-    if (id === 'u_admin' || id === currentUserId) {
-      alert('Không thể xóa tài khoản Quản trị viên tối cao đang đăng nhập!');
+  const handleToggleAccountStatus = async (id: string) => {
+    const target = accounts.find((a) => a.id === id);
+    if (!target) return;
+    if (id === currentUserId) {
+      alert('Không thể tự khóa tài khoản đang đăng nhập!');
+      return;
+    }
+    const nextLocked = target.status === 'active';
+    const result = await adminService.setStaffLocked(id, nextLocked);
+    if (result.error) {
+      alert(`Không thể ${nextLocked ? 'khóa' : 'mở'} tài khoản: ${result.error}`);
+      return;
+    }
+    await refreshStaffList();
+    soundManager.playTick();
+  };
+
+  const handleDeleteAccount = async (id: string) => {
+    if (id === currentUserId) {
+      alert('Không thể xóa tài khoản đang đăng nhập!');
       return;
     }
     const target = accounts.find((a) => a.id === id);
-    if (window.confirm(`Bạn có chắc chắn muốn xóa tài khoản "${target?.fullName || id}" (${target?.username}) không?`)) {
-      setAccounts((prev) => {
-        const updated = prev.filter((acc) => acc.id !== id);
-        localStorage.setItem('qllh_user_accounts', JSON.stringify(updated));
-        return updated;
-      });
-      soundManager.playTick();
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài khoản "${target?.fullName || id}" (${target?.username}) không? Hành động này không thể hoàn tác.`)) {
+      return;
     }
+    const result = await adminService.deleteStaffAccount(id);
+    if (result.error) {
+      alert(`Không thể xóa tài khoản: ${result.error}`);
+      return;
+    }
+    await refreshStaffList();
+    soundManager.playTick();
   };
 
   const handleStartEditAccount = (acc: UserAccount) => {
     setEditingAccount(acc);
     setEditUsername(acc.username);
     setEditFullName(acc.fullName);
-    setEditPassword(acc.password || '123');
+    setEditPassword('');
     setEditRole(acc.role);
-    setEditClassId(acc.classId || 'c1');
-    setEditStatus(acc.status);
-    setEditMustChangePassword(Boolean(acc.mustChangePassword));
   };
 
-  const handleSaveEditAccount = (e: React.FormEvent) => {
+  const handleSaveEditAccount = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingAccount || !editUsername.trim() || !editFullName.trim()) return;
+    if (!editingAccount || !editFullName.trim()) return;
 
-    // Check duplicate username (ignoring itself)
-    const isDup = accounts.some(
-      (a) => a.id !== editingAccount.id && a.username.toLowerCase() === editUsername.trim().toLowerCase()
-    );
-    if (isDup) {
-      alert('Tên đăng nhập này đã được sử dụng bởi một tài khoản khác!');
+    try {
+      await adminService.updateStaffProfile(editingAccount.id, {
+        fullName: editFullName.trim(),
+        role: editRole === 'admin' || editRole === 'teacher' ? editRole : undefined,
+      });
+
+      if (editPassword.trim()) {
+        if (editPassword.trim().length < 3) {
+          alert('Mật khẩu mới phải có ít nhất 3 ký tự!');
+          return;
+        }
+        const pwdResult = await adminService.resetStaffPassword(editingAccount.id, editPassword.trim());
+        if (pwdResult.error) {
+          alert(`Đã lưu tên/vai trò, nhưng không đổi được mật khẩu: ${pwdResult.error}`);
+        }
+      }
+    } catch (err: any) {
+      alert(`Không thể lưu thay đổi: ${err.message || 'Lỗi không xác định'}`);
       return;
     }
 
-    setAccounts((prev) => {
-      const updated = prev.map((acc) => {
-        if (acc.id === editingAccount.id) {
-          const avatarIcon = editRole === 'admin' ? '👨‍🏫' : editRole === 'teacher' ? '👩‍🏫' : (acc.avatar || '👦');
-          return {
-            ...acc,
-            username: editUsername.trim().toLowerCase(),
-            fullName: editFullName.trim(),
-            password: editPassword.trim() || acc.password,
-            role: editRole,
-            classId: editRole === 'student' ? editClassId : undefined,
-            status: editStatus,
-            mustChangePassword: editMustChangePassword,
-            avatar: avatarIcon,
-          };
-        }
-        return acc;
-      });
-      localStorage.setItem('qllh_user_accounts', JSON.stringify(updated));
-      return updated;
-    });
-
+    await refreshStaffList();
     setEditingAccount(null);
     soundManager.playFanfare();
   };
@@ -185,101 +183,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     e.preventDefault();
     if (!newUsername.trim() || !newFullName.trim()) return;
 
-    // Check duplicate
     if (accounts.some((a) => a.username.toLowerCase() === newUsername.trim().toLowerCase())) {
       alert('Tên đăng nhập này đã tồn tại! Vui lòng chọn tên khác.');
       return;
     }
 
-    const avatarIcon = newRole === 'admin' ? '👨‍🏫' : newRole === 'teacher' ? '👩‍🏫' : '👦';
+    const email = newUsername.includes('@') ? newUsername.trim() : `${newUsername.trim().toLowerCase()}@qllh.edu.vn`;
+    const pwd = newPassword.trim() || '123456';
+    const result = await adminService.createStaffAccount(email, pwd, newFullName.trim(), newRole === 'admin' ? 'admin' : 'teacher');
 
-    try {
-      const email = newUsername.includes('@') ? newUsername.trim() : `${newUsername.trim().toLowerCase()}@qllh.edu.vn`;
-      const pwd = newPassword.trim() || '123456';
-      await adminService.createStaffAccount(email, pwd, newFullName.trim());
-    } catch {}
+    if ('error' in result) {
+      alert(`Không thể tạo tài khoản: ${result.error}`);
+      return;
+    }
 
-    const created: UserAccount = {
-      id: `u_${Date.now()}`,
-      username: newUsername.trim().toLowerCase(),
-      password: newPassword.trim() || '123',
-      fullName: newFullName.trim(),
-      role: newRole,
-      classId: newRole === 'student' ? newClassId : undefined,
-      avatar: avatarIcon,
-      status: 'active',
-      mustChangePassword: newMustChangePassword,
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-
-    setAccounts((prev) => {
-      const updated = [created, ...prev];
-      localStorage.setItem('qllh_user_accounts', JSON.stringify(updated));
-      return updated;
-    });
-
+    await refreshStaffList();
     setShowAddAccountModal(false);
     setNewUsername('');
     setNewFullName('');
     setNewPassword('123');
-    setNewMustChangePassword(true);
     soundManager.playStarSound();
   };
 
 
-  // 1-Click: Generate accounts for all students in selected class
-  const handleGenerateClassAccounts = (classId: string) => {
-    const classToGen = classrooms.find((c) => c.id === classId);
-    const studentsInClass = students.filter((s) => s.classId === classId);
-
-    if (studentsInClass.length === 0) {
-      alert('Lớp học này chưa có học sinh để tạo tài khoản.');
-      return;
-    }
-
-    if (!window.confirm(`Hệ thống sẽ tự động tạo tài khoản đăng nhập cho toàn bộ ${studentsInClass.length} học sinh của ${classToGen?.name || 'lớp'} với mật khẩu mặc định là "123"?`)) {
-      return;
-    }
-
-    const newAccounts: UserAccount[] = studentsInClass.map((st) => {
-      const usernameClean = `hs_${st.code.toLowerCase()}`;
-      return {
-        id: `u_gen_${st.id}`,
-        username: usernameClean,
-        password: '123',
-        fullName: st.name,
-        role: 'student',
-        classId: st.classId,
-        studentId: st.id,
-        avatar: st.avatar,
-        status: 'active',
-        createdAt: new Date().toISOString().split('T')[0]
-      };
-    });
-
-    // Merge without duplicates
-    setAccounts((prev) => {
-      const existingUsernames = new Set(prev.map((a) => a.username));
-      const filteredNew = newAccounts.filter((a) => !existingUsernames.has(a.username));
-      const updated = [...filteredNew, ...prev];
-      localStorage.setItem('qllh_user_accounts', JSON.stringify(updated));
-      return updated;
-    });
-
-    soundManager.playFanfare();
-    confetti({ particleCount: 60, spread: 60, origin: { y: 0.6 } });
-    alert(`Đã tạo thành công tài khoản cho học sinh lớp ${classToGen?.name}! Tên đăng nhập có dạng hs_hs001, hs_hs002... Mật khẩu là: 123`);
-  };
-
-  const handleChangeAdminPassword = (e: React.FormEvent) => {
+  const handleChangeAdminPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    const adminAcc = accounts.find((a) => a.role === 'admin');
-    if (!adminAcc) return;
+    const myAccount = accounts.find((a) => a.id === currentUserId);
+    if (!myAccount) return;
 
-    if (adminOldPassword !== adminAcc.password) {
-      setPasswordChangeMsg({ text: 'Mật khẩu cũ không chính xác!', type: 'error' });
-      return;
-    }
     if (adminNewPassword.length < 3) {
       setPasswordChangeMsg({ text: 'Mật khẩu mới phải có ít nhất 3 ký tự!', type: 'error' });
       return;
@@ -289,13 +220,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return;
     }
 
-    setAccounts((prev) => {
-      const updated = prev.map((a) => (a.role === 'admin' ? { ...a, password: adminNewPassword } : a));
-      localStorage.setItem('qllh_user_accounts', JSON.stringify(updated));
-      return updated;
-    });
+    const result = await adminService.changeOwnPassword(myAccount.username, adminOldPassword, adminNewPassword);
+    if (result.error) {
+      setPasswordChangeMsg({ text: result.error, type: 'error' });
+      return;
+    }
 
-    setPasswordChangeMsg({ text: 'Đổi mật khẩu Quản trị viên thành công!', type: 'success' });
+    setPasswordChangeMsg({ text: 'Đổi mật khẩu thành công!', type: 'success' });
     setAdminOldPassword('');
     setAdminNewPassword('');
     setAdminConfirmPassword('');
@@ -774,7 +705,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   required
                 />
                 <span className="text-[11px] text-slate-400 mt-0.5 block">
-                  Mặc định: 123 (người dùng sẽ được yêu cầu đổi mật khẩu khi đăng nhập lần đầu)
+                  Gửi mật khẩu này cho giáo viên để họ tự đăng nhập; có thể đổi lại sau trong mục Sửa tài khoản.
                 </span>
               </div>
 
@@ -794,23 +725,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   {newRole === 'admin' && 'Quản trị viên có toàn quyền kiểm soát thẻ Quản trị tối cao, sửa/xóa tài khoản và cấu hình hệ thống.'}
                   {newRole === 'teacher' && 'Giáo viên chỉ được thao tác các nội dung giảng dạy: Lớp học, Điểm danh, Trắc nghiệm, Học liệu, Trò chơi, Tiện ích theo phân quyền. Không được vào thẻ Quản trị.'}
                 </p>
-              </div>
-
-              {/* Must change password checkbox */}
-              <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 flex items-start gap-2.5">
-                <input
-                  type="checkbox"
-                  id="newMustChange"
-                  checked={newMustChangePassword}
-                  onChange={(e) => setNewMustChangePassword(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded mt-0.5"
-                />
-                <label htmlFor="newMustChange" className="text-xs text-amber-900 cursor-pointer">
-                  <strong>Bắt buộc đổi mật khẩu khi đăng nhập lần đầu</strong>
-                  <span className="block text-[11px] text-amber-800/80 mt-0.5">
-                    Hệ thống sẽ tự động hiện khung đổi mật khẩu ngay sau khi người dùng này đăng nhập.
-                  </span>
-                </label>
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
@@ -854,15 +768,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <form onSubmit={handleSaveEditAccount} className="space-y-3.5">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Tên đăng nhập <span className="text-rose-500">*</span>
+                  Tên đăng nhập (email)
                 </label>
                 <input
                   type="text"
                   value={editUsername}
-                  onChange={(e) => setEditUsername(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl font-mono focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                  required
+                  disabled
+                  className="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl font-mono bg-slate-50 text-slate-400 cursor-not-allowed"
                 />
+                <p className="text-[10px] text-slate-400 mt-1">Không đổi được email đăng nhập ở đây.</p>
               </div>
 
               <div>
@@ -880,63 +794,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Mật khẩu tài khoản
+                  Đặt mật khẩu mới
                 </label>
                 <input
                   type="text"
                   value={editPassword}
                   onChange={(e) => setEditPassword(e.target.value)}
-                  placeholder="Để trống nếu không đổi..."
+                  placeholder="Để trống nếu không đổi mật khẩu..."
                   className="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl font-mono"
-                  required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Vai trò
-                  </label>
-                  <select
-                    value={editRole}
-                    onChange={(e) => setEditRole(e.target.value as UserRole)}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white font-medium"
-                  >
-                    <option value="teacher">👨‍🏫 Giáo viên</option>
-                    <option value="admin">🛡️ Quản trị viên</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Trạng thái
-                  </label>
-                  <select
-                    value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value as 'active' | 'locked')}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white font-medium"
-                  >
-                    <option value="active">Đang mở (Hoạt động)</option>
-                    <option value="locked">Đã khóa</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Must change password checkbox */}
-              <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 flex items-start gap-2.5">
-                <input
-                  type="checkbox"
-                  id="editMustChange"
-                  checked={editMustChangePassword}
-                  onChange={(e) => setEditMustChangePassword(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded mt-0.5"
-                />
-                <label htmlFor="editMustChange" className="text-xs text-amber-900 cursor-pointer">
-                  <strong>Yêu cầu đổi mật khẩu ở lần đăng nhập tiếp theo</strong>
-                  <span className="block text-[11px] text-amber-800/80 mt-0.5">
-                    Hệ thống sẽ bắt buộc người dùng này đổi mật khẩu mới ngay khi đăng nhập.
-                  </span>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Vai trò
                 </label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as UserRole)}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white font-medium"
+                >
+                  <option value="teacher">👨‍🏫 Giáo viên</option>
+                  <option value="admin">🛡️ Quản trị viên</option>
+                </select>
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
