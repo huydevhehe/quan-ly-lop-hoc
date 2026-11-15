@@ -111,6 +111,8 @@ interface ClassroomManagerProps {
   currentUser?: UserAccount;
   selectedClassIdExternal?: string;
   onSelectClassExternal?: (id: string) => void;
+  selectedYearExternal?: string;
+  onSelectYearExternal?: (year: string) => void;
   targetSubTab?: 'week' | 'student' | 'grade';
   actionTrigger?: {
     action: 'edit_class' | 'delete_class' | 'delete_year';
@@ -127,6 +129,8 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   currentUser,
   selectedClassIdExternal,
   onSelectClassExternal,
+  selectedYearExternal,
+  onSelectYearExternal,
   targetSubTab = 'week',
   actionTrigger,
 }) => {
@@ -137,6 +141,21 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   const [yearsData, setYearsData] = useState<string[]>([]);
   const [yearNameToId, setYearNameToId] = useState<Record<string, string>>({});
   const [currentYear, setCurrentYear] = useState<string>('');
+
+  // Đồng bộ 2 chiều với năm học đang chọn ở Sidebar (App.tsx), tránh tình trạng Sidebar
+  // hiện 1 năm còn khu vực "Năm học hiện tại" ở đây hiện năm khác do 2 state tách biệt.
+  useEffect(() => {
+    if (selectedYearExternal && selectedYearExternal !== currentYear) {
+      setCurrentYear(selectedYearExternal);
+    }
+  }, [selectedYearExternal]);
+
+  useEffect(() => {
+    if (currentYear && onSelectYearExternal) {
+      onSelectYearExternal(currentYear);
+    }
+  }, [currentYear]);
+
   // Danh sách đầy đủ năm học thật từ server (phục vụ bảng tổng hợp "Tất cả năm học")
   const [allSchoolYears, setAllSchoolYears] = useState<SchoolYearItem[]>([]);
 

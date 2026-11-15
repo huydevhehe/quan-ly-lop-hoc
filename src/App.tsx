@@ -65,6 +65,9 @@ export default function App() {
   const [selectedYear, setSelectedYear] = useState(() => {
     return localStorage.getItem('qllh_current_year') || '';
   });
+  useEffect(() => {
+    if (selectedYear) localStorage.setItem('qllh_current_year', selectedYear);
+  }, [selectedYear]);
   const [targetSubTab, setTargetSubTab] = useState<'week' | 'student' | 'grade'>('week');
 
 
@@ -492,6 +495,8 @@ export default function App() {
                 currentUser={currentUser}
                 selectedClassIdExternal={selectedClassId || undefined}
                 onSelectClassExternal={(id) => setSelectedClassId(id || null)}
+                selectedYearExternal={selectedYear || undefined}
+                onSelectYearExternal={setSelectedYear}
                 targetSubTab={targetSubTab}
                 actionTrigger={classroomActionTrigger}
               />
