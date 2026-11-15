@@ -11,10 +11,8 @@ import {
   Copy,
   Check,
   QrCode,
-  Sparkles,
   Menu,
   X,
-  Download,
   ShieldCheck,
   Key,
   BarChart3,
@@ -443,44 +441,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
 
-          <div className="pt-2 px-2 space-y-1.5">
-            <button
-              onClick={() => {
-                setActiveTab('classroom');
-                setIsMobileOpen(false);
-              }}
-              className="w-full py-2 px-3 text-xs font-semibold text-slate-600 hover:text-blue-600 hover:bg-blue-50/50 rounded-lg flex items-center gap-2 transition-colors border border-dashed border-slate-200"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Vào lớp học đang dạy</span>
-            </button>
-
-            <button
-              onClick={() => {
-                onOpenDownloadGuide();
-                setIsMobileOpen(false);
-              }}
-              className="w-full py-2 px-3 text-xs font-semibold text-indigo-600 bg-indigo-50/70 hover:bg-indigo-100 rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Cài đặt / Tải ứng dụng</span>
-            </button>
-
-            {onOpenBackup && (
-              <button
-                type="button"
-                onClick={() => {
-                  onOpenBackup();
-                  setIsMobileOpen(false);
-                }}
-                className="w-full py-2 px-3 text-xs font-semibold text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100 rounded-lg flex items-center gap-2 transition-colors border border-emerald-200/60 cursor-pointer"
-                title="Sao lưu toàn bộ học sinh, điểm số và bảo vệ cơ sở dữ liệu qua từng năm"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Sao lưu & Bảo vệ CSDL</span>
-              </button>
-            )}
-          </div>
         </div>
 
         {/* Bottom Section: Mã phòng học & User info */}
