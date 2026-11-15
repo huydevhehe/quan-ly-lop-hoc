@@ -661,8 +661,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               <span className="font-semibold text-slate-800">
                                 {owner.fullName} <span className="text-slate-400 font-normal">({owner.username})</span>
                               </span>
+                            ) : cls.createdBy ? (
+                              <span className="text-slate-400 italic">Tài khoản đã xóa</span>
                             ) : (
-                              <span className="text-slate-400 italic">Chưa rõ / tài khoản đã xóa</span>
+                              <span className="text-slate-400 italic">Chưa gán giáo viên</span>
                             )}
                           </td>
                           <td className="py-3.5 px-4">
