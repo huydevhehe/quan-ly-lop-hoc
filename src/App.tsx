@@ -144,6 +144,9 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('qllh_active_tab', activeTab);
+    // Luôn cuộn về đầu trang khi chuyển mục: tránh các nút/tab con (vd: "Quản lý tài khoản" trong
+    // Quản trị & Phân quyền) bị thanh header dính (sticky) ở trên che mất và không bấm được trên màn hình nhỏ.
+    window.scrollTo(0, 0);
   }, [activeTab]);
 
   const [isCloudConnected, setIsCloudConnected] = useState(true);

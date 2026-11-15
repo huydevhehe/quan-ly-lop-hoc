@@ -55,6 +55,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
 
+  // Cuộn về đầu trang khi đổi tab con: nếu đang cuộn xuống, thanh header dính (sticky) phía trên
+  // sẽ che mất hàng nút chuyển tab và học sinh/giáo viên không bấm lại được.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeTab]);
+
   useEffect(() => {
     adminService.listStaff().then((staffList) => {
       if (staffList.length > 0) {
@@ -553,7 +559,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <th className="py-3 px-4">Tên đăng nhập</th>
                     <th className="py-3 px-4">Họ và tên</th>
                     <th className="py-3 px-4">Vai trò</th>
-                    <th className="py-3 px-4">Mật khẩu</th>
                     <th className="py-3 px-4 text-center">Trạng thái</th>
                     <th className="py-3 px-4 text-right">Thao tác</th>
                   </tr>
@@ -586,16 +591,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             ? 'Giáo viên'
                             : 'Học sinh'}
                         </span>
-                      </td>
-                      <td className="py-3.5 px-4 font-mono text-slate-700">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-bold text-slate-800">{acc.password || '123'}</span>
-                          {acc.mustChangePassword && (
-                            <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded font-sans font-semibold inline-block w-fit">
-                              🔑 Đổi MK lần đầu
-                            </span>
-                          )}
-                        </div>
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         <button
