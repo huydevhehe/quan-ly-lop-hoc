@@ -211,11 +211,6 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
   onCloseModal,
   currentUser,
 }) => {
-  // Current academic year
-  const [currentYear] = useState<string>(() => {
-    return localStorage.getItem('qllh_current_year') || '2026-2027';
-  });
-
   // Sort order synced with Thẻ Điểm ('default' = Chuẩn, 'alphabet', 'code')
   const [sortOrder, setSortOrder] = useState<'default' | 'alphabet' | 'code'>(() => getSavedGradeSortTypeLocal());
 
@@ -463,23 +458,20 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
     window.dispatchEvent(new CustomEvent('qllh_grade_sort_changed', { detail: newOrder }));
   };
 
-  // Filter classes belonging to selected grade and current year
+  // Filter classes belonging to selected grade
   const matchingClasses = useMemo(() => {
-    const yearFiltered = classesList.filter(
-      (c) => c.year === currentYear
-    );
     if (selectedGrade === 'all') {
-      return yearFiltered.sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true }));
+      return classesList.slice().sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true }));
     }
 
-    return yearFiltered
+    return classesList
       .filter((c) => {
         const gradeClean = c.grade ? String(c.grade).replace(/[^0-9]/g, '') : '';
         const nameFirstChar = c.name.trim().charAt(0);
         return gradeClean === selectedGrade || nameFirstChar === selectedGrade;
       })
       .sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true }));
-  }, [classesList, currentYear, selectedGrade, currentUser]);
+  }, [classesList, selectedGrade, currentUser]);
 
   // Read uploaded Excel comment file (Image 1 format)
   const handleImportCommentsFile = (file: File, type: 'T' | 'H') => {
@@ -641,7 +633,7 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
   // Perform Generation & Export Excel (Image 2 format) with Grade-specific comments
   const handleExecuteExport = () => {
     if (matchingClasses.length === 0) {
-      alert(`Không tìm thấy lớp nào thuộc Khối ${selectedGrade} trong năm học ${currentYear}!`);
+      alert(`Không tìm thấy lớp nào thuộc Khối ${selectedGrade}!`);
       return;
     }
 
