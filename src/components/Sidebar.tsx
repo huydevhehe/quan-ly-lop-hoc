@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { ActiveTab, StudentPermissions, UserAccount } from '../types';
 import { listMyClasses } from '../services/classesService';
+import { listSchoolYears } from '../services/schoolYearsService';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -93,8 +94,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   useEffect(() => {
     const updateSidebarData = () => {
-      listMyClasses()
-        .then((classes) => {
+      Promise.all([
+        listMyClasses(),
+        listSchoolYears().catch(() => []),
+      ])
+        .then(([classes, schoolYears]) => {
           const mapped = classes.map((c) => ({
             id: c.id,
             year: c.academicYear || '2026-2027',
@@ -102,7 +106,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             grade: String(c.grade),
           }));
           setSidebarClasses(mapped);
-          const years = Array.from(new Set(mapped.map((c) => c.year)));
+          const classYears = mapped.map((c) => c.year);
+          const serverYears = (schoolYears || []).map((y) => y.name);
+          const years = Array.from(new Set([...classYears, ...serverYears]));
           if (years.length > 0) {
             setSidebarYears(years);
             // Nếu năm học đang chọn không khớp năm nào có lớp thật, tự chuyển về năm thật đầu tiên
@@ -323,7 +329,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <option value="">Chọn lớp nhanh...</option>
                         {classesInCurrentYear.map((c) => (
                           <option key={c.id} value={c.id}>
-                            {c.name} · {c.grade}
+                            {c.name} · Khối {c.grade}
                           </option>
                         ))}
                       </select>

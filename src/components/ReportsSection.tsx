@@ -10,6 +10,9 @@ import {
   CheckCircle2,
   AlertCircle,
   FileSpreadsheet,
+  X,
+  CalendarCheck,
+  MessageSquareText,
 } from 'lucide-react';
 import { StudentCommentsManager, sortStudentsLikeGradeTab } from './StudentCommentsManager';
 
@@ -17,6 +20,18 @@ import { UserAccount } from '../types';
 import { listMyClasses } from '../services/classesService';
 import { listStudentsByClass } from '../services/studentsService';
 import { getClassScores, saveScore, getClassStats, ClassStats } from '../services/scoresService';
+import { getAllCommentBanks, CommentBankEntry } from '../services/commentBankService';
+import {
+  getWeekRangeForTerm,
+  getAttendanceSummaryForClasses,
+  getStudentAttendanceHistory,
+  resolveClassGrade,
+  pickCommentBank,
+  resolveClassification,
+  StudentAttendanceSummary,
+  StudentAttendanceWeek,
+  TOTAL_WEEKS,
+} from '../services/reportsExportService';
 import { ClassificationPieChart } from './reports/ClassificationPieChart';
 import { ScoreAttendanceBarChart } from './reports/ScoreAttendanceBarChart';
 import { WarningBanner } from './reports/WarningBanner';
@@ -108,6 +123,34 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
   const [searchQuery, setSearchQuery] = useState('');
   const [showCommentsModal, setShowCommentsModal] = useState(false);
 
+  // Ngân hàng nhận xét T/H theo Khối, tải thật từ Supabase (dùng để gán nhận xét tổng hợp)
+  const [commentBankT, setCommentBankT] = useState<Record<string, CommentBankEntry>>({});
+  const [commentBankH, setCommentBankH] = useState<Record<string, CommentBankEntry>>({});
+
+  const loadCommentBanks = () => {
+    Promise.all([getAllCommentBanks('T'), getAllCommentBanks('H')])
+      .then(([banksT, banksH]) => {
+        setCommentBankT(banksT);
+        setCommentBankH(banksH);
+      })
+      .catch((err) => console.error('Lỗi tải ngân hàng nhận xét:', err));
+  };
+
+  useEffect(() => {
+    loadCommentBanks();
+    window.addEventListener('qllh_data_updated', loadCommentBanks);
+    return () => window.removeEventListener('qllh_data_updated', loadCommentBanks);
+  }, []);
+
+  // Tổng hợp điểm danh (có mặt / vắng có phép / vắng không phép) theo học sinh, cho khoảng
+  // tuần của Học kỳ 1 / Cả năm đang chọn — dùng cho dashboard tổng quan & xuất báo cáo tổng hợp.
+  const [attendanceSummary, setAttendanceSummary] = useState<Record<string, StudentAttendanceSummary>>({});
+
+  // Chi tiết học sinh đang xem (modal), kèm lịch sử điểm danh tải riêng khi mở modal.
+  const [selectedStudentDetail, setSelectedStudentDetail] = useState<StudentRecord | null>(null);
+  const [studentAttendanceHistory, setStudentAttendanceHistory] = useState<StudentAttendanceWeek[]>([]);
+  const [loadingStudentDetail, setLoadingStudentDetail] = useState(false);
+
   // Báo cáo hiển thị tất cả các lớp (không lọc theo năm học vì màn này không có bộ chọn năm học)
   const yearClasses = classesList;
 
@@ -159,6 +202,44 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
     if (selectedClassId === 'all') return null;
     return classesList.find((c) => c.id === selectedClassId) || null;
   }, [selectedClassId, classesList]);
+
+  // Tải tổng hợp điểm danh thật từ Supabase theo đúng khoảng tuần của Học kỳ 1 / Cả năm
+  useEffect(() => {
+    const { start, end } = getWeekRangeForTerm(selectedTerm);
+    const classIds =
+      selectedClassId !== 'all'
+        ? [selectedClassId]
+        : (yearClasses.length > 0 ? yearClasses : classesList).map((c) => c.id);
+
+    if (classIds.length === 0) {
+      setAttendanceSummary({});
+      return;
+    }
+
+    getAttendanceSummaryForClasses(classIds, start, end)
+      .then(setAttendanceSummary)
+      .catch((err) => {
+        console.error('Lỗi tải tổng hợp điểm danh:', err);
+        setAttendanceSummary({});
+      });
+  }, [selectedClassId, selectedTerm, yearClasses, classesList]);
+
+  // Tải lịch sử điểm danh riêng cho học sinh đang xem chi tiết (modal)
+  useEffect(() => {
+    if (!selectedStudentDetail) {
+      setStudentAttendanceHistory([]);
+      return;
+    }
+    const { start, end } = getWeekRangeForTerm(selectedTerm);
+    setLoadingStudentDetail(true);
+    getStudentAttendanceHistory(selectedStudentDetail.id, start, end)
+      .then(setStudentAttendanceHistory)
+      .catch((err) => {
+        console.error('Lỗi tải lịch sử điểm danh học sinh:', err);
+        setStudentAttendanceHistory([]);
+      })
+      .finally(() => setLoadingStudentDetail(false));
+  }, [selectedStudentDetail, selectedTerm]);
 
   // Get active grade sort type
   const [reportSortType, setReportSortType] = useState<'default' | 'alphabet' | 'code'>(() => {
@@ -259,6 +340,78 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
       unranked: unrankedCount,
     };
   }, [filteredStudents, gradeData, selectedTerm]);
+
+  // Tổng hợp điểm danh của các học sinh đang hiển thị (theo đúng khoảng tuần HK1/Cả năm)
+  const attendanceStats = useMemo(() => {
+    let present = 0;
+    let excused = 0;
+    let unexcused = 0;
+
+    for (const st of filteredStudents) {
+      const att = attendanceSummary[st.id];
+      if (att) {
+        present += att.present;
+        excused += att.excused;
+        unexcused += att.unexcused;
+      }
+    }
+
+    return { present, excused, unexcused, absent: excused + unexcused };
+  }, [filteredStudents, attendanceSummary]);
+
+  // Gán nhận xét T/H tự động cho từng học sinh (dùng chung logic rotation với "Xuất đánh giá
+  // Excel" của StudentCommentsManager, để 2 nơi luôn cho ra kết quả nhận xét khớp nhau).
+  const assignedComments = useMemo(() => {
+    const result: Record<string, { rank: 'T' | 'H'; comment: string }> = {};
+    const classesToProcess =
+      selectedClassId === 'all'
+        ? (yearClasses.length > 0 ? yearClasses : classesList)
+        : currentSelectedClass
+        ? [currentSelectedClass]
+        : [];
+
+    for (const cls of classesToProcess) {
+      const rawClassStudents = studentsList.filter((s) => s.classId === cls.id);
+      const classStudents = sortStudentsLikeGradeTab(rawClassStudents, reportSortType);
+      const grade = resolveClassGrade(cls.grade, cls.name);
+      const commentsT = pickCommentBank(grade, 'T', { T: commentBankT, H: commentBankH });
+      const commentsH = pickCommentBank(grade, 'H', { T: commentBankT, H: commentBankH });
+
+      let countT = 0;
+      let countH = 0;
+
+      for (const st of classStudents) {
+        const key = `${st.id}_${selectedTerm}`;
+        const keyCode = st.code ? `${st.code}_${selectedTerm}` : '';
+        const rec = gradeData[key] || (keyCode ? gradeData[keyCode] : null) || { lt: '', th: '', total: '', rank: '' };
+        const rank = resolveClassification(rec.rank, rec.total);
+
+        let comment = '';
+        if (rank === 'T') {
+          comment = commentsT[countT % commentsT.length];
+          countT++;
+        } else {
+          comment = commentsH[countH % commentsH.length];
+          countH++;
+        }
+
+        result[st.id] = { rank, comment };
+      }
+    }
+
+    return result;
+  }, [
+    selectedClassId,
+    yearClasses,
+    classesList,
+    currentSelectedClass,
+    studentsList,
+    reportSortType,
+    gradeData,
+    selectedTerm,
+    commentBankT,
+    commentBankH,
+  ]);
 
   // Helper to sanitize Excel sheet names (max 31 chars, no invalid chars /\?*[]:)
   const sanitizeSheetName = (name: string, existing: Set<string>): string => {
@@ -375,6 +528,141 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
     XLSX.writeFile(workbook, fileName);
   };
 
+  // Xuất báo cáo tổng hợp: Điểm + Nhận xét + Điểm danh, mỗi lớp 1 sheet, mỗi học sinh 1 dòng.
+  const [isExportingCombined, setIsExportingCombined] = useState(false);
+  const [showExportWeekModal, setShowExportWeekModal] = useState(false);
+  const [exportWeekStart, setExportWeekStart] = useState(1);
+  const [exportWeekEnd, setExportWeekEnd] = useState(TOTAL_WEEKS);
+
+  const handleOpenExportWeekModal = () => {
+    if (filteredStudents.length === 0) {
+      alert('Không có dữ liệu học sinh nào để xuất báo cáo!');
+      return;
+    }
+    // Gợi ý sẵn khoảng tuần theo Học kỳ 1 / Cả năm đang chọn, người dùng có thể chỉnh lại trước khi xuất.
+    const { start, end } = getWeekRangeForTerm(selectedTerm);
+    setExportWeekStart(start);
+    setExportWeekEnd(end);
+    setShowExportWeekModal(true);
+  };
+
+  const handleExportCombinedReport = async (start: number, end: number) => {
+    if (filteredStudents.length === 0) {
+      alert('Không có dữ liệu học sinh nào để xuất báo cáo!');
+      return;
+    }
+    if (start < 1 || end < start) {
+      alert('Khoảng tuần không hợp lệ! Tuần bắt đầu phải từ 1 trở lên và không lớn hơn tuần kết thúc.');
+      return;
+    }
+
+    setShowExportWeekModal(false);
+    setIsExportingCombined(true);
+    try {
+      const classesToExport =
+        selectedClassId === 'all'
+          ? (yearClasses.length > 0 ? yearClasses : classesList)
+          : currentSelectedClass
+          ? [currentSelectedClass]
+          : [];
+
+      if (classesToExport.length === 0) {
+        alert('Không tìm thấy lớp nào để xuất báo cáo!');
+        return;
+      }
+
+      let attendance: Record<string, StudentAttendanceSummary> = {};
+      try {
+        attendance = await getAttendanceSummaryForClasses(
+          classesToExport.map((c) => c.id),
+          start,
+          end
+        );
+      } catch (err: any) {
+        console.error('Lỗi tải điểm danh khi xuất báo cáo tổng hợp:', err);
+        alert(`Không thể tải dữ liệu điểm danh: ${err?.message || err}. Báo cáo vẫn được xuất, phần điểm danh sẽ để trống.`);
+      }
+
+      const workbook = XLSX.utils.book_new();
+      const usedSheetNames = new Set<string>();
+
+      const combinedCols = [
+        { wch: 8 },  // STT
+        { wch: 16 }, // Mã HS
+        { wch: 26 }, // Họ và tên
+        { wch: 16 }, // Điểm Lý Thuyết
+        { wch: 16 }, // Điểm Thực Hành
+        { wch: 12 }, // Tổng Điểm
+        { wch: 12 }, // Xếp Loại
+        { wch: 55 }, // Nhận xét
+        { wch: 15 }, // Số buổi có mặt
+        { wch: 18 }, // Số buổi vắng có phép
+        { wch: 18 }, // Số buổi vắng không phép
+      ];
+
+      for (const cls of classesToExport) {
+        const rawClassStudents = studentsList.filter((s) => s.classId === cls.id);
+        const classStudents = sortStudentsLikeGradeTab(rawClassStudents, reportSortType);
+
+        const sheetRows = classStudents.map((st, idx) => {
+          const key = `${st.id}_${selectedTerm}`;
+          const keyCode = st.code ? `${st.code}_${selectedTerm}` : '';
+          const rec = gradeData[key] || (keyCode ? gradeData[keyCode] : null) || { lt: '', th: '', total: '', rank: '' };
+          const assigned = assignedComments[st.id];
+          const att = attendance[st.id] || { present: 0, excused: 0, unexcused: 0 };
+
+          return {
+            STT: idx + 1,
+            'Mã HS': st.code,
+            'Họ và tên': st.name,
+            'Điểm Lý Thuyết': rec.lt !== undefined && rec.lt !== '' ? Number(rec.lt) : '',
+            'Điểm Thực Hành': rec.th !== undefined && rec.th !== '' ? Number(rec.th) : '',
+            'Tổng Điểm': rec.total !== undefined && rec.total !== '' ? Number(rec.total) : '',
+            'Xếp Loại': rec.rank || assigned?.rank || '',
+            'Nhận xét': assigned?.comment || '',
+            'Số buổi có mặt': att.present,
+            'Số buổi vắng có phép': att.excused,
+            'Số buổi vắng không phép': att.unexcused,
+          };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(
+          sheetRows.length > 0
+            ? sheetRows
+            : [
+                {
+                  STT: '',
+                  'Mã HS': '',
+                  'Họ và tên': '(Lớp chưa có học sinh)',
+                  'Điểm Lý Thuyết': '',
+                  'Điểm Thực Hành': '',
+                  'Tổng Điểm': '',
+                  'Xếp Loại': '',
+                  'Nhận xét': '',
+                  'Số buổi có mặt': '',
+                  'Số buổi vắng có phép': '',
+                  'Số buổi vắng không phép': '',
+                },
+              ]
+        );
+
+        worksheet['!cols'] = combinedCols;
+        const sheetTitle = sanitizeSheetName(cls.name, usedSheetNames);
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetTitle);
+      }
+
+      const safeClassName = currentSelectedClass
+        ? currentSelectedClass.name.replace(/[^a-zA-Z0-9]/g, '_')
+        : 'Tat_Ca_Cac_Lop';
+      const termSlug = selectedTerm === 'hk1' ? 'Hoc_Ky_1' : 'Ca_Nam';
+      const fileName = `Bao_Cao_Tong_Hop_${safeClassName}_${termSlug}.xlsx`;
+
+      XLSX.writeFile(workbook, fileName);
+    } finally {
+      setIsExportingCombined(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fadeIn pb-12">
       {/* Top Banner Card */}
@@ -394,26 +682,37 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
             </p>
           </div>
 
-          {/* Actions: Export Excel & Export Evaluation */}
+          {/* Actions: Combined export (primary) + legacy exports (secondary) */}
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
               onClick={() => setShowCommentsModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-2 text-sm shadow-xs whitespace-nowrap cursor-pointer active:scale-95"
+              className="bg-white hover:bg-slate-50 text-indigo-700 border border-indigo-200 px-3.5 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 text-xs shadow-2xs whitespace-nowrap cursor-pointer active:scale-95"
               title="Xuất đánh giá và nhận xét học sinh tự động ra Excel (theo khối hoặc tất cả các lớp)"
             >
-              <Award className="w-4 h-4" />
+              <Award className="w-3.5 h-3.5" />
               <span>Xuất đánh giá Excel</span>
             </button>
 
             <button
               type="button"
               onClick={handleExportExcel}
-              className="bg-[#0070f3] hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-2 text-sm shadow-xs whitespace-nowrap cursor-pointer active:scale-95"
-              title="Xuất bảng điểm ra file Excel"
+              className="bg-white hover:bg-slate-50 text-[#0070f3] border border-blue-200 px-3.5 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 text-xs shadow-2xs whitespace-nowrap cursor-pointer active:scale-95"
+              title="Xuất bảng điểm ra file Excel (chỉ điểm số)"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-3.5 h-3.5" />
               <span>Xuất Excel</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenExportWeekModal}
+              disabled={isExportingCombined}
+              className="bg-[#0070f3] hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl font-bold transition flex items-center justify-center gap-2 text-sm shadow-md whitespace-nowrap cursor-pointer active:scale-95"
+              title="Xuất 1 file Excel tổng hợp: điểm số + nhận xét + điểm danh, mỗi lớp 1 sheet"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>{isExportingCombined ? 'Đang xuất...' : 'Xuất báo cáo tổng hợp'}</span>
             </button>
           </div>
         </div>
@@ -526,6 +825,51 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
         </div>
       </div>
 
+      {/* Attendance & Remarks Coverage Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+            <CalendarCheck className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500">
+              Có mặt ({selectedTerm === 'hk1' ? 'HK1' : 'Cả năm'})
+            </p>
+            <p className="text-xl font-black text-emerald-600">{attendanceStats.present}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0">
+            <AlertCircle className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500">
+              Vắng ({selectedTerm === 'hk1' ? 'HK1' : 'Cả năm'})
+            </p>
+            <p className="text-xl font-black text-amber-600">{attendanceStats.absent}</p>
+            <p className="text-[10px] font-semibold text-slate-400">
+              {attendanceStats.excused} có phép · {attendanceStats.unexcused} không phép
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
+            <MessageSquareText className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500">Đã có nhận xét</p>
+            <p className="text-xl font-black text-indigo-600">
+              {stats.good + stats.pass} / {stats.total}
+            </p>
+            <p className="text-[10px] font-semibold text-slate-400">
+              {stats.unranked} học sinh chưa xếp loại nên dùng nhận xét mặc định
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Main Report Table (Matching Excel columns in image 27a0ed05.png) */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -581,7 +925,14 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
                         {st.code}
                       </td>
                       <td className="p-3 font-bold text-blue-900">
-                        {st.name}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStudentDetail(st)}
+                          className="hover:underline hover:text-blue-700 cursor-pointer text-left"
+                          title="Xem chi tiết điểm, điểm danh và nhận xét của học sinh"
+                        >
+                          {st.name}
+                        </button>
                       </td>
                       {selectedClassId === 'all' && (
                         <td className="p-3 font-bold text-slate-600">
@@ -640,6 +991,161 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
               onCloseModal={() => setShowCommentsModal(false)}
               currentUser={currentUser}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Student Detail Drill-down Modal (read-only): grades + attendance history + remark */}
+      {selectedStudentDetail && (() => {
+        const st = selectedStudentDetail;
+        const key = `${st.id}_${selectedTerm}`;
+        const keyCode = st.code ? `${st.code}_${selectedTerm}` : '';
+        const rec = gradeData[key] || (keyCode ? gradeData[keyCode] : null) || { lt: '', th: '', total: '', rank: '' };
+        const assigned = assignedComments[st.id];
+        const detailClassName = classesList.find((c) => c.id === st.classId)?.name || '-';
+
+        const presentWeeks = studentAttendanceHistory.filter((w) => w.status === 'present');
+        const excusedWeeks = studentAttendanceHistory.filter((w) => w.status === 'excused');
+        const unexcusedWeeks = studentAttendanceHistory.filter((w) => w.status === 'unexcused');
+
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+            onClick={() => setSelectedStudentDetail(null)}
+          >
+            <div
+              className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative animate-fadeIn"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setSelectedStudentDetail(null)}
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer"
+                title="Đóng"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="pr-10 mb-5">
+                <h3 className="text-xl font-black text-slate-900">{st.name}</h3>
+                <p className="text-xs font-bold text-slate-500 mt-0.5">
+                  Mã HS: {st.code} · Lớp {detailClassName} · {selectedTerm === 'hk1' ? 'Học kỳ 1' : 'Cả năm'}
+                </p>
+              </div>
+
+              {/* Điểm số */}
+              <div className="mb-5">
+                <h4 className="text-xs font-black text-slate-700 uppercase tracking-wide mb-2">Điểm số</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
+                    <p className="text-[10px] font-bold text-slate-500">Lý thuyết</p>
+                    <p className="text-lg font-black text-slate-800">{rec.lt !== '' ? rec.lt : '-'}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
+                    <p className="text-[10px] font-bold text-slate-500">Thực hành</p>
+                    <p className="text-lg font-black text-slate-800">{rec.th !== '' ? rec.th : '-'}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
+                    <p className="text-[10px] font-bold text-slate-500">Tổng điểm</p>
+                    <p className="text-lg font-black text-blue-600">{rec.total !== '' ? rec.total : '-'}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
+                    <p className="text-[10px] font-bold text-slate-500">Xếp loại</p>
+                    <p className="text-lg font-black text-emerald-600">{rec.rank || assigned?.rank || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Điểm danh */}
+              <div className="mb-5">
+                <h4 className="text-xs font-black text-slate-700 uppercase tracking-wide mb-2">
+                  Lịch sử điểm danh ({selectedTerm === 'hk1' ? 'Học kỳ 1' : 'Cả năm'})
+                </h4>
+                {loadingStudentDetail ? (
+                  <p className="text-xs text-slate-400 font-semibold">Đang tải...</p>
+                ) : studentAttendanceHistory.length === 0 ? (
+                  <p className="text-xs text-slate-400 font-semibold">Chưa có dữ liệu điểm danh.</p>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-emerald-700">
+                      Có mặt ({presentWeeks.length}):{' '}
+                      {presentWeeks.length > 0 ? presentWeeks.map((w) => w.weekNumber).join(', ') : '—'}
+                    </p>
+                    <p className="text-xs font-semibold text-amber-700">
+                      Vắng có phép ({excusedWeeks.length}):{' '}
+                      {excusedWeeks.length > 0 ? excusedWeeks.map((w) => w.weekNumber).join(', ') : '—'}
+                    </p>
+                    <p className="text-xs font-semibold text-rose-700">
+                      Vắng không phép ({unexcusedWeeks.length}):{' '}
+                      {unexcusedWeeks.length > 0 ? unexcusedWeeks.map((w) => w.weekNumber).join(', ') : '—'}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Nhận xét */}
+              <div>
+                <h4 className="text-xs font-black text-slate-700 uppercase tracking-wide mb-2">Nhận xét</h4>
+                <p className="text-sm text-slate-700 bg-indigo-50 border border-indigo-100 rounded-xl p-3 font-medium">
+                  {assigned?.comment || 'Chưa có nhận xét cho học sinh này.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Popup chọn khoảng tuần điểm danh trước khi xuất báo cáo tổng hợp */}
+      {showExportWeekModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-sm p-6 space-y-4">
+            <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4 text-[#0070f3]" />
+              Chọn khoảng tuần điểm danh để xuất
+            </h3>
+            <p className="text-xs text-slate-500">
+              Điểm số và nhận xét luôn tính theo {selectedTerm === 'hk1' ? 'Học kỳ 1' : 'Cả năm'} đang chọn. Phần điểm danh sẽ được tổng hợp đúng theo khoảng tuần bạn chọn dưới đây.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Từ tuần</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={TOTAL_WEEKS}
+                  value={exportWeekStart}
+                  onChange={(e) => setExportWeekStart(Number(e.target.value))}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Đến tuần</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={TOTAL_WEEKS}
+                  value={exportWeekEnd}
+                  onChange={(e) => setExportWeekEnd(Number(e.target.value))}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowExportWeekModal(false)}
+                className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportCombinedReport(exportWeekStart, exportWeekEnd)}
+                className="px-4 py-1.5 text-xs font-semibold bg-[#0070f3] text-white rounded-lg hover:bg-blue-700"
+              >
+                Xuất báo cáo
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Link2, AlertCircle, Check, Loader2 } from 'lucide-react';
+import { Link2, AlertCircle, Check, Loader2, Upload, Image as ImageIcon } from 'lucide-react';
 import { createResource } from '../../services/resourcesService';
+import { uploadQuestionImage } from '../../services/quizImageService';
 
 interface SaveLinkFormProps {
   type: 'video' | 'link';
@@ -18,8 +19,20 @@ export const SaveLinkForm: React.FC<SaveLinkFormProps> = ({
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
   const [selectedGrade, setSelectedGrade] = useState<number>(grade);
+  const [thumbnailUrl, setThumbnailUrl] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSelectedFile(file);
+    const objectUrl = URL.createObjectURL(file);
+    setImagePreview(objectUrl);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,16 +50,33 @@ export const SaveLinkForm: React.FC<SaveLinkFormProps> = ({
 
     setIsSaving(true);
     try {
+      let finalThumb = thumbnailUrl.trim();
+
+      // Nếu có chọn file ảnh, upload lên storage
+      if (selectedFile) {
+        const uploadRes = await uploadQuestionImage(selectedFile);
+        if ('error' in uploadRes) {
+          setErrorMsg(uploadRes.error);
+          setIsSaving(false);
+          return;
+        }
+        finalThumb = uploadRes.url;
+      }
+
       await createResource({
         type,
         title: title.trim(),
         url: url.trim(),
         grade: selectedGrade,
+        thumbnailUrl: finalThumb || undefined,
         isActive: true,
       });
 
       setTitle('');
       setUrl('');
+      setThumbnailUrl('');
+      setSelectedFile(null);
+      setImagePreview(null);
       if (onSaved) onSaved();
     } catch (err: any) {
       setErrorMsg(err.message || 'Không thể lưu liên kết. Vui lòng kiểm tra lại URL.');
@@ -110,13 +140,53 @@ export const SaveLinkForm: React.FC<SaveLinkFormProps> = ({
           }`}
           required
         />
-        {errorMsg && (
-          <p className="flex items-center gap-1 text-[11px] text-rose-600 mt-1 font-medium">
-            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-            <span>{errorMsg}</span>
-          </p>
+      </div>
+
+      <div>
+        <label className="block text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1">
+          <ImageIcon className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Ảnh thumbnail (không bắt buộc)</span>
+        </label>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <label className="px-3 py-2 bg-white border border-slate-200 hover:border-emerald-300 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-2xs">
+            <Upload className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Tải ảnh từ máy tính</span>
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </label>
+          <span className="text-xs text-slate-400">hoặc</span>
+          <input
+            type="url"
+            placeholder="Nhập trực tiếp link ảnh thumbnail https://..."
+            value={thumbnailUrl}
+            onChange={(e) => {
+              setThumbnailUrl(e.target.value);
+              setImagePreview(e.target.value);
+            }}
+            className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium focus:outline-emerald-500"
+          />
+        </div>
+
+        {imagePreview && (
+          <div className="mt-3 relative aspect-video max-w-xs rounded-2xl overflow-hidden border border-slate-200 shadow-xs bg-slate-900">
+            <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+            <span className="absolute bottom-1.5 right-2 px-2 py-0.5 rounded bg-black/60 text-white text-[10px] font-bold">
+              Xem trước
+            </span>
+          </div>
         )}
       </div>
+
+      {errorMsg && (
+        <p className="flex items-center gap-1 text-[11px] text-rose-600 mt-1 font-medium">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          <span>{errorMsg}</span>
+        </p>
+      )}
 
       <div className="flex items-center justify-end gap-2 pt-1">
         {onCancel && (

@@ -190,7 +190,18 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 min-w-0 flex-1 hover:text-emerald-700"
                 >
-                  <ExternalLink className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  {link.thumbnailUrl ? (
+                    <img
+                      src={link.thumbnailUrl}
+                      alt={link.title}
+                      referrerPolicy="no-referrer"
+                      className="w-9 h-9 rounded-lg object-cover border border-slate-200 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+                      <ExternalLink className="w-3.5 h-3.5 text-emerald-600" />
+                    </div>
+                  )}
                   <span className="text-xs font-semibold text-slate-800 truncate">{link.title}</span>
                   <span className="text-[10px] text-slate-400 shrink-0">Khối {link.grade}</span>
                 </a>

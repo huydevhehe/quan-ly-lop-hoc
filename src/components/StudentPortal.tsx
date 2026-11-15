@@ -25,7 +25,8 @@ import confetti from 'canvas-confetti';
 import { QuizSubmission, Classroom, Resource, Student } from '../types';
 import { soundManager } from '../utils/audio';
 import { signInStudentWithRoomCode } from '../services/authService';
-import { listActiveTopics, startExamSession, submitExamSession, ExamQuestion } from '../services/examService';
+import { startExamSession, submitExamSession, ExamQuestion } from '../services/examService';
+import { listTopics, QuizTopicItem } from '../services/quizService';
 import { listResources } from '../services/resourcesService';
 import { listStudentsByClass } from '../services/studentsService';
 
@@ -67,6 +68,10 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
   const [studentName, setStudentName] = useState('');
   const [pendingTopicIds, setPendingTopicIds] = useState<string[]>([]);
+
+  // Chọn chủ đề thi (chế độ "mở" - khi khối chưa bị giáo viên khóa 1 chủ đề cụ thể)
+  const [isTopicPickerOpen, setIsTopicPickerOpen] = useState(false);
+  const [pickableTopics, setPickableTopics] = useState<QuizTopicItem[]>([]);
 
   // Quiz Taking state
   const [activeQuizList, setActiveQuizList] = useState<ExamQuestion[]>([]);
@@ -144,23 +149,50 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
     }
   };
 
-  // Open Name Input Modal: kiểm tra trước xem khối này có chủ đề thi nào đang kích hoạt không
+  // Open Name Input Modal: kiểm tra trước xem khối này có chủ đề thi nào đang kích hoạt không.
+  // Quy tắc (theo C7):
+  // - Nếu khối có 1 chủ đề đang bị giáo viên "khóa" (isForced) -> bỏ qua bước chọn,
+  //   tự động vào thẳng chủ đề đó, các chủ đề active khác bị ẩn.
+  // - Nếu không có chủ đề nào bị khóa -> cho học sinh tự chọn đúng 1 trong các chủ đề
+  //   đang active (không gộp pool nhiều chủ đề nữa).
   const handlePrepareQuiz = async () => {
     setIsPreparingExam(true);
     try {
-      const topics = await listActiveTopics(selectedGrade);
-      if (topics.length === 0) {
+      const allTopics = await listTopics();
+      const activeTopicsOfGrade = allTopics.filter(
+        (t) => t.grade === selectedGrade && t.isActive
+      );
+
+      if (activeTopicsOfGrade.length === 0) {
         alert(`Hiện tại chưa có đề thi trắc nghiệm cho Khối ${selectedGrade}. Thầy cô có thể bật đề trong phần quản trị!`);
         return;
       }
-      setPendingTopicIds(topics.map((t) => t.id));
+
+      const forcedTopic = activeTopicsOfGrade.find((t) => t.isForced);
+      if (forcedTopic) {
+        setPendingTopicIds([forcedTopic.id]);
+        soundManager.playStarSound();
+        setIsNameModalOpen(true);
+        return;
+      }
+
+      // Chế độ "mở": hiện danh sách chủ đề active để học sinh tự chọn đúng 1 cái
+      setPickableTopics(activeTopicsOfGrade);
       soundManager.playStarSound();
-      setIsNameModalOpen(true);
+      setIsTopicPickerOpen(true);
     } catch (err: any) {
       alert(err.message || 'Không thể tải đề thi, vui lòng thử lại.');
     } finally {
       setIsPreparingExam(false);
     }
+  };
+
+  // Học sinh đã chọn đúng 1 chủ đề trong chế độ "mở" -> tiếp tục sang bước nhập tên
+  const handleChooseTopic = (topicId: string) => {
+    setPendingTopicIds([topicId]);
+    setIsTopicPickerOpen(false);
+    soundManager.playStarSound();
+    setIsNameModalOpen(true);
   };
 
   // Start the timed quiz: tạo phiên thi thật trên server (câu hỏi xáo trộn, không lộ đáp án đúng)
@@ -516,6 +548,47 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                 <Gamepad2 className="w-4 h-4" />
                 <span>Giải trí</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: CHỌN CHỦ ĐỀ THI (chế độ "mở" - không có chủ đề bị khóa) */}
+      {/* ======================================================== */}
+      {isTopicPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
+            <div className="p-6 bg-gradient-to-r from-sky-50 to-blue-50 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-800 text-base">Chọn chủ đề thi</h3>
+                <p className="text-xs text-slate-500">
+                  Khối {selectedGrade} - Chọn đúng 1 chủ đề để bắt đầu làm bài
+                </p>
+              </div>
+              <button
+                onClick={() => setIsTopicPickerOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-2.5 max-h-[60vh] overflow-y-auto">
+              {pickableTopics.map((topic) => (
+                <button
+                  key={topic.id}
+                  type="button"
+                  onClick={() => handleChooseTopic(topic.id)}
+                  className="w-full text-left p-4 rounded-2xl border-2 border-slate-200 hover:border-sky-500 hover:bg-sky-50/60 transition-all flex items-center justify-between gap-3 cursor-pointer"
+                >
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-sm text-slate-800 truncate">{topic.name}</h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{topic.questionCount} câu hỏi</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-sky-500 shrink-0" />
+                </button>
+              ))}
             </div>
           </div>
         </div>

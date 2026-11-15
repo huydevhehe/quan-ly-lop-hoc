@@ -7,6 +7,7 @@ export interface QuizTopicItem {
   grade: number;
   name: string;
   isActive: boolean;
+  isForced: boolean;
   questionCount: number;
 }
 
@@ -153,6 +154,7 @@ export async function listTopics(): Promise<QuizTopicItem[]> {
       grade,
       name,
       is_active,
+      is_forced,
       quiz_questions (count)
     `)
     .order('grade', { ascending: true })
@@ -173,6 +175,7 @@ export async function listTopics(): Promise<QuizTopicItem[]> {
       grade: t.grade || 1,
       name: t.name,
       isActive: t.is_active ?? false,
+      isForced: t.is_forced ?? false,
       questionCount: qCount,
     };
   });
@@ -214,6 +217,25 @@ export async function setTopicActive(topicId: string, isActive: boolean): Promis
 }
 
 /**
+ * Khóa (hoặc bỏ khóa) 1 chủ đề cho học sinh của khối đó.
+ * Khi 1 chủ đề được khóa (is_forced = true), học sinh của khối đó CHỈ được làm
+ * đúng chủ đề này, các chủ đề active khác bị ẩn khỏi lựa chọn.
+ * Ràng buộc tối đa 1 chủ đề bị khóa mỗi khối được DB tự enforce qua unique
+ * partial index (xem migration 0015) - ở tầng UI cần tự tắt các chủ đề khác
+ * cùng khối trước khi gọi hàm này với forced = true.
+ */
+export async function setTopicForced(topicId: string, forced: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('quiz_topics')
+    .update({ is_forced: forced })
+    .eq('id', topicId);
+
+  if (error) {
+    throw new Error(`Không thể cập nhật trạng thái khóa chủ đề: ${error.message}`);
+  }
+}
+
+/**
  * Lấy toàn bộ câu hỏi trong ngân hàng (mọi chủ đề, dành cho Giáo viên quản lý, có correctIndex)
  */
 export async function listAllQuestions(): Promise<QuizQuestion[]> {
@@ -237,6 +259,7 @@ export async function listAllQuestions(): Promise<QuizQuestion[]> {
       question: q.content,
       options: Array.isArray(q.options) ? q.options : [],
       correctIndex: q.correct_index,
+      imageUrl: q.image_url || undefined,
       explanation: '',
     };
   });
@@ -263,6 +286,7 @@ export async function listQuestionsByTopic(topicId: string): Promise<QuizQuestio
     question: q.content,
     options: Array.isArray(q.options) ? q.options : [],
     correctIndex: q.correct_index,
+    imageUrl: q.image_url || undefined,
     explanation: '',
   }));
 }
@@ -278,6 +302,7 @@ export async function createQuestion(input: Omit<QuizQuestion, 'id'>): Promise<s
       content: input.question.trim(),
       options: input.options,
       correct_index: input.correctIndex,
+      image_url: input.imageUrl || null,
     })
     .select('id')
     .single();

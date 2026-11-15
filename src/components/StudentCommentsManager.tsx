@@ -11,6 +11,7 @@ import {
   FileText,
   HelpCircle,
   RotateCcw,
+  ChevronDown,
 } from 'lucide-react';
 
 import { UserAccount } from '../types';
@@ -748,6 +749,47 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
     );
   };
 
+  // Accordion: section nào đang mở (mặc định mở cấu hình + menu nạp Excel H/T của khối đang chọn,
+  // thu gọn sẵn phần xem trước bảng dài để trang đỡ dài khi mới mở)
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    () => new Set(['config', 'uploadMenu', 'export'])
+  );
+
+  const toggleSection = (key: string) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const AccordionHeader: React.FC<{
+    sectionKey: string;
+    title: string;
+    subtitle?: string;
+  }> = ({ sectionKey, title, subtitle }) => {
+    const isOpen = expandedSections.has(sectionKey);
+    return (
+      <button
+        type="button"
+        onClick={() => toggleSection(sectionKey)}
+        className="w-full flex items-center justify-between gap-3 text-left cursor-pointer"
+      >
+        <div>
+          <h4 className="text-xs sm:text-sm font-bold text-slate-800">{title}</h4>
+          {subtitle && <p className="text-[11px] text-slate-500 font-medium mt-0.5">{subtitle}</p>}
+        </div>
+        <ChevronDown
+          className={`w-4 h-4 text-slate-500 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+    );
+  };
+
   // Preview data for the first matching class
   const previewClass = matchingClasses[0] || null;
   const previewStudents = useMemo(() => {
@@ -812,7 +854,14 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
         </div>
 
         {/* Configuration Row: Khối lớp, Kỳ đánh giá & Thứ tự sắp xếp học sinh (Đồng bộ Thẻ Điểm) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-4">
+          <AccordionHeader
+            sectionKey="config"
+            title="Cấu hình xuất nhận xét"
+            subtitle="1. Khối lớp · 2. Kỳ đánh giá · 3. Thứ tự học sinh"
+          />
+          {expandedSections.has('config') && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* 1. Chọn Khối Lớp */}
           <div>
             <label className="block text-xs font-bold text-slate-800 mb-1.5">
@@ -900,20 +949,20 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
                 : 'Đang xếp theo thứ tự mã số học sinh.'}
             </p>
           </div>
+          </div>
+          )}
         </div>
 
         {/* 3. Nạp 2 file Excel nhận xét cho loại H và loại T theo từng Khối (1 -> 5) */}
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <label className="block text-xs font-bold text-slate-800">
-                3. Menu Khối nạp file Excel nhận xét loại H và loại T (Khối 1 đến 5):
-              </label>
-              <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                Nhấp chọn từng <strong>Khối (1, 2, 3, 4, 5)</strong> bên dưới để nạp nhận xét tương ứng. Khi xuất file Excel, mỗi lớp sẽ tự động lấy đúng nhận xét của khối đó.
-              </p>
-            </div>
-
+          <AccordionHeader
+            sectionKey="uploadMenu"
+            title="3. Menu Khối nạp file Excel nhận xét loại H và loại T (Khối 1 đến 5)"
+            subtitle="Nhấp chọn từng Khối (1, 2, 3, 4, 5) bên dưới để nạp nhận xét tương ứng. Khi xuất file Excel, mỗi lớp sẽ tự động lấy đúng nhận xét của khối đó."
+          />
+          {expandedSections.has('uploadMenu') && (
+          <>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-2">
             {/* Nút sao chép tiện ích */}
             <button
               type="button"
@@ -1084,40 +1133,63 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
               )}
             </div>
           </div>
+          </>
+          )}
         </div>
 
-        {/* Ghi chú quy tắc tự động lặp lại nhận xét */}
-        <div className="flex items-start gap-2.5 p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-medium">
-          <HelpCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-          <p>
-            <strong>Cơ chế tự động theo Khối:</strong> Khi xuất file Excel, mỗi lớp (VD: 1/1, 2/2, 3/1, 4/3, 5/2...) sẽ tự động lấy câu nhận xét của đúng Khối tương ứng. Mỗi học sinh được gán 1 câu theo xếp loại T/H; nếu số nhận xét ít hơn số học sinh của lớp, hệ thống sẽ tự động quay vòng từ đầu đến cuối theo thứ tự.
-          </p>
-        </div>
-
-        {/* Nút Thực hiện Xuất file Excel */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-slate-100">
-          <div className="text-xs text-slate-600 font-semibold">
-            Sẽ xuất file Excel gồm <strong>{matchingClasses.length} Sheet</strong> (mỗi sheet là 1 lớp thuộc {selectedGrade === 'all' ? 'tất cả các khối' : `Khối ${selectedGrade}`}).
+        {/* Ghi chú quy tắc tự động lặp lại nhận xét + Nút Thực hiện Xuất file Excel */}
+        <div className="space-y-4">
+          <AccordionHeader
+            sectionKey="export"
+            title="4. Xuất file Excel đánh giá"
+            subtitle="Quy tắc tự động lặp lại nhận xét theo Khối & nút thực hiện xuất file"
+          />
+          {expandedSections.has('export') && (
+          <>
+          <div className="flex items-start gap-2.5 p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-medium">
+            <HelpCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <p>
+              <strong>Cơ chế tự động theo Khối:</strong> Khi xuất file Excel, mỗi lớp (VD: 1/1, 2/2, 3/1, 4/3, 5/2...) sẽ tự động lấy câu nhận xét của đúng Khối tương ứng. Mỗi học sinh được gán 1 câu theo xếp loại T/H; nếu số nhận xét ít hơn số học sinh của lớp, hệ thống sẽ tự động quay vòng từ đầu đến cuối theo thứ tự.
+            </p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleExecuteExport}
-            className="w-full sm:w-auto px-7 py-3 bg-[#0070F3] hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>Thực hiện & Xuất file Excel đánh giá</span>
-          </button>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-slate-100">
+            <div className="text-xs text-slate-600 font-semibold">
+              Sẽ xuất file Excel gồm <strong>{matchingClasses.length} Sheet</strong> (mỗi sheet là 1 lớp thuộc {selectedGrade === 'all' ? 'tất cả các khối' : `Khối ${selectedGrade}`}).
+            </div>
+
+            <button
+              type="button"
+              onClick={handleExecuteExport}
+              className="w-full sm:w-auto px-7 py-3 bg-[#0070F3] hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Thực hiện & Xuất file Excel đánh giá</span>
+            </button>
+          </div>
+          </>
+          )}
         </div>
 
-        {/* Live Preview Section (Khớp bố cục ảnh 2) */}
+        {/* Live Preview Section (Khớp bố cục ảnh 2) — accordion, thu gọn mặc định vì bảng dài */}
         {previewClass && previewStudents.length > 0 && (
           <div className="border border-slate-200 rounded-2xl overflow-hidden mt-6">
             <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-[#0070F3]" />
-                Xem trước bố cục xuất file (Mẫu lớp {previewClass.name} - Ảnh 2):
-              </span>
+              <button
+                type="button"
+                onClick={() => toggleSection('preview')}
+                className="flex-1 flex items-center justify-between gap-2 text-left cursor-pointer"
+              >
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-[#0070F3]" />
+                  Xem trước bố cục xuất file (Mẫu lớp {previewClass.name} - Ảnh 2):
+                </span>
+                <ChevronDown
+                  className={`w-4 h-4 text-slate-500 shrink-0 transition-transform ${
+                    expandedSections.has('preview') ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
                   Thứ tự: {sortOrder === 'default' ? 'Chuẩn (như thẻ điểm)' : sortOrder === 'alphabet' ? 'Alphabet' : 'Mã HS'}
@@ -1128,6 +1200,7 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
               </div>
             </div>
 
+            {expandedSections.has('preview') && (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
@@ -1199,6 +1272,7 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         )}
       </div>

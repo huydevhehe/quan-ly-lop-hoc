@@ -4,6 +4,7 @@ import {
   Calendar,
   Users,
   GraduationCap,
+  BookOpen,
   Plus,
   Trash2,
   Edit,
@@ -27,7 +28,7 @@ import confetti from 'canvas-confetti';
 import { Student, UserAccount } from '../types';
 import { listMyClasses, createClass, updateClass, deleteClass } from '../services/classesService';
 import { listStudentsByClass, upsertStudents, deleteStudent } from '../services/studentsService';
-import { listSchoolYears, createSchoolYear } from '../services/schoolYearsService';
+import { listSchoolYears, createSchoolYear, SchoolYearItem } from '../services/schoolYearsService';
 import {
   getWeekAttendance,
   saveWeekAttendance,
@@ -45,6 +46,7 @@ export interface ClassItem {
   bg?: string;
   createdBy?: string;
   createdByName?: string;
+  totalStudents?: number;
 }
 
 export interface StudentRecord {
@@ -77,6 +79,28 @@ export interface GradeRecord {
   th: string;
   total: string;
   rank: string;
+}
+
+// Màu nhận diện riêng cho từng khối lớp (1-5) để các thẻ lớp dễ phân biệt
+const GRADE_ACCENT_COLORS: Record<number, {
+  border: string;
+  badgeBg: string;
+  badgeText: string;
+  iconText: string;
+  button: string;
+  buttonHover: string;
+}> = {
+  1: { border: 'border-sky-200', badgeBg: 'bg-sky-50', badgeText: 'text-sky-700', iconText: 'text-sky-600', button: 'bg-sky-500', buttonHover: 'hover:bg-sky-600' },
+  2: { border: 'border-emerald-200', badgeBg: 'bg-emerald-50', badgeText: 'text-emerald-700', iconText: 'text-emerald-600', button: 'bg-emerald-500', buttonHover: 'hover:bg-emerald-600' },
+  3: { border: 'border-amber-200', badgeBg: 'bg-amber-50', badgeText: 'text-amber-700', iconText: 'text-amber-600', button: 'bg-amber-500', buttonHover: 'hover:bg-amber-600' },
+  4: { border: 'border-violet-200', badgeBg: 'bg-violet-50', badgeText: 'text-violet-700', iconText: 'text-violet-600', button: 'bg-violet-500', buttonHover: 'hover:bg-violet-600' },
+  5: { border: 'border-rose-200', badgeBg: 'bg-rose-50', badgeText: 'text-rose-700', iconText: 'text-rose-600', button: 'bg-rose-500', buttonHover: 'hover:bg-rose-600' },
+};
+
+function getGradeAccentColor(gradeLabel: string) {
+  const match = gradeLabel.match(/(\d+)/);
+  const gradeNum = match ? parseInt(match[1], 10) : 0;
+  return GRADE_ACCENT_COLORS[gradeNum] || GRADE_ACCENT_COLORS[1];
 }
 
 interface ClassroomManagerProps {
@@ -112,10 +136,13 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   const [yearsData, setYearsData] = useState<string[]>([]);
   const [yearNameToId, setYearNameToId] = useState<Record<string, string>>({});
   const [currentYear, setCurrentYear] = useState<string>('');
+  // Danh sách đầy đủ năm học thật từ server (phục vụ bảng tổng hợp "Tất cả năm học")
+  const [allSchoolYears, setAllSchoolYears] = useState<SchoolYearItem[]>([]);
 
   const fetchSchoolYears = async (preferYear?: string) => {
     try {
       const years = await listSchoolYears();
+      setAllSchoolYears(years);
       if (years.length === 0) {
         setYearsData([]);
         setYearNameToId({});
@@ -173,6 +200,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
         bg: 'bg-emerald-500',
         createdBy: currentUser?.id,
         createdByName: currentUser?.fullName || 'Giáo viên',
+        totalStudents: c.totalStudents,
       }));
       setClassesData(mapped);
       // Gộp thêm các năm học "mồ côi" (lớp cũ chưa gán năm học thật) để không bị mất khỏi danh sách tab
@@ -540,9 +568,12 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     if (visibleClassesInCurrentYear.length > 0) {
       const exists = visibleClassesInCurrentYear.some((c: ClassItem) => c.id === currentClassId);
       if (!exists) {
+        // Lớp đang chọn không còn tồn tại trong năm học mới (đổi tài khoản/đổi năm) -> tự động
+        // chọn lớp thay thế CHỈ cục bộ, không gọi onSelectClassExternal vì đó là kênh dành cho
+        // người dùng chủ động chọn lớp (và sẽ ép currentView về 'detail' ở effect khác),
+        // khiến việc đổi năm học bị nhảy thẳng vào màn hình chi tiết lớp ngoài ý muốn.
         const nextId = visibleClassesInCurrentYear[0].id;
         setCurrentClassId(nextId);
-        if (onSelectClassExternal) onSelectClassExternal(nextId);
       }
     } else {
       if (currentClassId !== '') {
@@ -554,6 +585,21 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       }
     }
   }, [visibleClassesInCurrentYear, currentYear, currentUser?.id]);
+
+  // Tổng hợp số lớp & số học sinh theo từng năm học (cho bảng "Tất cả năm học")
+  const schoolYearsSummary = useMemo(() => {
+    return allSchoolYears.map((y) => {
+      const classesOfYear = normalizedClasses.filter((c: ClassItem) => c.year === y.name);
+      const totalStudents = classesOfYear.reduce((sum, c) => sum + (c.totalStudents || 0), 0);
+      return {
+        id: y.id,
+        name: y.name,
+        isActive: y.isActive,
+        classCount: classesOfYear.length,
+        totalStudents,
+      };
+    });
+  }, [allSchoolYears, normalizedClasses]);
 
   // Tổng số học sinh của các lớp thuộc tài khoản này
   const currentYearStudentsCount = useMemo(() => {
@@ -1618,6 +1664,46 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             </div>
           </div>
 
+          {/* Tổng hợp tất cả năm học (bổ sung, không thay thế bộ chọn năm học hiện tại ở trên) */}
+          {schoolYearsSummary.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs">
+              <p className="text-xs text-slate-500 font-bold uppercase mb-3">Tất cả năm học</p>
+              <div className="space-y-2">
+                {schoolYearsSummary.map((y) => (
+                  <div
+                    key={y.id}
+                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl border text-sm ${
+                      y.name === currentYear
+                        ? 'border-blue-200 bg-blue-50/60'
+                        : 'border-slate-200 bg-slate-50/60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`font-bold ${y.name === currentYear ? 'text-[#0070f3]' : 'text-slate-800'}`}>
+                        {y.name}
+                      </span>
+                      {y.isActive && (
+                        <span className="text-[10px] font-bold uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                          Đang hoạt động
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 text-xs font-semibold text-slate-600">
+                      <span className="flex items-center gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+                        {y.classCount} lớp
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <GraduationCap className="w-3.5 h-3.5 text-amber-500" />
+                        {y.totalStudents} học sinh
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Action Header for Classes Grid */}
           <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-slate-200 pb-4 gap-4">
             <div>
@@ -1708,10 +1794,11 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 pb-4">
               {filteredClasses.map((cls: ClassItem) => {
                 const hsCount = studentsData.filter((s: StudentRecord) => s.classId === cls.id).length;
+                const gradeColor = getGradeAccentColor(cls.grade);
                 return (
                   <div
                     key={cls.id}
-                    className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs hover:shadow-md transition-all relative group"
+                    className={`bg-white border-2 ${gradeColor.border} rounded-2xl p-5 shadow-2xs hover:shadow-md transition-all relative group`}
                   >
                     {canManage && (
                       <div className="absolute top-4 right-4 flex gap-1.5 transition-opacity">
@@ -1742,7 +1829,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                       <div>
                         <h4 className="font-black text-slate-900 text-lg">{cls.name}</h4>
                         <div className="flex items-center gap-1.5 mt-1">
-                          <p className="text-xs text-slate-500 font-bold uppercase">{cls.grade}</p>
+                          <p className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${gradeColor.badgeBg} ${gradeColor.badgeText}`}>{cls.grade}</p>
                           {adminViewAll && cls.createdByName && (
                             <span className="text-[10px] bg-slate-100 text-slate-600 font-medium px-1.5 py-0.5 rounded">
                               Tạo: {cls.createdByName}
@@ -1754,12 +1841,12 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
 
                     <div className="flex items-center justify-between mt-4">
                       <p className="text-sm font-medium text-slate-600 bg-white/80 border border-slate-200/60 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                        <Users className="w-3.5 h-3.5 text-[#0070f3]" />
+                        <Users className={`w-3.5 h-3.5 ${gradeColor.iconText}`} />
                         <span>{hsCount} HS</span>
                       </p>
                       <button
                         onClick={() => handleOpenClassDetail(cls.id)}
-                        className="text-sm font-bold text-white bg-[#0070f3] px-4 py-2 rounded-lg hover:bg-blue-700 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                        className={`text-sm font-bold text-white ${gradeColor.button} px-4 py-2 rounded-lg ${gradeColor.buttonHover} transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95`}
                       >
                         <span>Mở lớp</span>
                         <span className="text-xs font-mono">→</span>

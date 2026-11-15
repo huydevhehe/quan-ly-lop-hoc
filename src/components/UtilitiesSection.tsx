@@ -599,24 +599,34 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
                 {utilityLinks.map((link) => (
                   <div
                     key={link.id}
-                    className="p-4 rounded-2xl border border-slate-200 hover:border-indigo-300 bg-white hover:shadow-xs transition-all flex flex-col justify-between"
+                    className="rounded-2xl border border-slate-200 hover:border-indigo-300 bg-white hover:shadow-xs transition-all flex flex-col justify-between overflow-hidden"
                   >
-                    <div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
-                        <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                          Khối {link.grade}
-                        </span>
-                        <a
-                          href={link.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-slate-400 hover:text-indigo-600 p-1"
-                          title="Mở liên kết"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      </div>
-                      <h4 className="font-bold text-slate-800 text-xs mt-1 leading-snug line-clamp-2">
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block relative aspect-video w-full bg-slate-900 overflow-hidden"
+                      title="Mở liên kết"
+                    >
+                      {link.thumbnailUrl ? (
+                        <img
+                          src={link.thumbnailUrl}
+                          alt={link.title}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-indigo-50">
+                          <ExternalLink className="w-6 h-6 text-indigo-400" />
+                        </div>
+                      )}
+                      <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-indigo-600/90 text-white text-[10px] font-bold">
+                        Khối {link.grade}
+                      </span>
+                    </a>
+
+                    <div className="p-4">
+                      <h4 className="font-bold text-slate-800 text-xs leading-snug line-clamp-2">
                         {link.title}
                       </h4>
                       <p className="text-[11px] text-slate-400 mt-1 truncate font-mono">
@@ -625,7 +635,7 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
                     </div>
 
                     {isAdmin && (
-                      <div className="flex items-center justify-end pt-3 mt-2 border-t border-slate-100">
+                      <div className="flex items-center justify-end px-4 pb-3 pt-1 border-t border-slate-100">
                         <button
                           onClick={async () => {
                             if (confirm('Bạn chắc chắn muốn xóa liên kết này?')) {

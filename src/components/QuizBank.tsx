@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   GraduationCap,
-  Play,
   Plus,
   CheckCircle2,
   XCircle,
   HelpCircle,
-  Clock,
-  ArrowRight,
-  ArrowLeft,
   X,
   BookOpen,
   FileSpreadsheet,
@@ -20,9 +16,12 @@ import {
   RefreshCw,
   Trophy,
   Check,
-  Calendar
+  Calendar,
+  Upload,
+  ArrowRight,
+  ArrowLeft,
+  Loader2,
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import * as XLSX from 'xlsx';
 import { QuizQuestion, QuizSubmission } from '../types';
 import { soundManager } from '../utils/audio';
@@ -39,6 +38,7 @@ import {
   bulkInsertQuestions,
   QuizTopicItem,
 } from '../services/quizService';
+import { uploadQuestionImage } from '../services/quizImageService';
 import { QuizTopicActivationPanel } from './QuizTopicActivationPanel';
 
 interface QuizBankProps {
@@ -68,12 +68,6 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
 
   // Filter grade in bank: all or 1, 2, 3, 4, 5
   const [selectedGrade, setSelectedGrade] = useState<number | 'all'>('all');
-  const [isPlayingMode, setIsPlayingMode] = useState(false);
-  const [currentQuizIndex, setCurrentQuizIndex] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
-  const [timerSeconds, setTimerSeconds] = useState(30);
-  const [isTimerActive, setIsTimerActive] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Submissions State (Scores of students)
@@ -136,10 +130,21 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
 
   // New question form state
   const [newGrade, setNewGrade] = useState(4);
-  const [newTopic, setNewTopic] = useState('Chủ đề: Kiến thức tin học');
+  const [newTopicChoice, setNewTopicChoice] = useState<string>(''); // id của chủ đề đã có, hoặc '__new__'
+  const [newTopicName, setNewTopicName] = useState('');
   const [newQuestion, setNewQuestion] = useState('');
   const [newOptions, setNewOptions] = useState(['', '', '', '']);
   const [newCorrectIndex, setNewCorrectIndex] = useState(0);
+  const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
+  const [newImageUrl, setNewImageUrl] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState('');
+
+  // Mỗi khi đổi khối lớp trong form thêm câu hỏi, reset lựa chọn chủ đề (vì chủ đề phụ thuộc khối)
+  useEffect(() => {
+    setNewTopicChoice('');
+    setNewTopicName('');
+  }, [newGrade]);
 
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
 
@@ -149,77 +154,25 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
       (!selectedTopicId || q.topic === selectedTopicId)
   );
 
-  const activeQuestion = filteredQuizzes[currentQuizIndex] || filteredQuizzes[0];
+  const handleNewImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  // Timer countdown for classroom projector playing mode
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    if (isPlayingMode && isTimerActive && timerSeconds > 0) {
-      interval = setInterval(() => {
-        setTimerSeconds((prev) => {
-          if (prev <= 1) {
-            soundManager.playAlarm();
-            setIsTimerActive(false);
-            return 0;
-          }
-          if (prev <= 5) {
-            soundManager.playTick();
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isPlayingMode, isTimerActive, timerSeconds]);
-
-  const handleStartPlay = (startIndex = 0) => {
-    setCurrentQuizIndex(startIndex);
-    setSelectedOption(null);
-    setIsAnswerRevealed(false);
-    setTimerSeconds(30);
-    setIsTimerActive(true);
-    setIsPlayingMode(true);
-  };
-
-  const handleSelectOptionInPlay = (idx: number) => {
-    if (isAnswerRevealed) return;
-    setSelectedOption(idx);
-  };
-
-  const handleRevealAnswer = () => {
-    setIsAnswerRevealed(true);
-    setIsTimerActive(false);
-    if (selectedOption === activeQuestion.correctIndex) {
-      soundManager.playFanfare();
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: { y: 0.6 }
-      });
-    } else {
-      soundManager.playTick();
-    }
-  };
-
-  const handleNextQuestion = () => {
-    if (currentQuizIndex < filteredQuizzes.length - 1) {
-      setCurrentQuizIndex((prev) => prev + 1);
-      setSelectedOption(null);
-      setIsAnswerRevealed(false);
-      setTimerSeconds(30);
-      setIsTimerActive(true);
-    }
-  };
-
-  const handlePrevQuestion = () => {
-    if (currentQuizIndex > 0) {
-      setCurrentQuizIndex((prev) => prev - 1);
-      setSelectedOption(null);
-      setIsAnswerRevealed(false);
-      setTimerSeconds(30);
-      setIsTimerActive(true);
+    setImageUploadError('');
+    const objectUrl = URL.createObjectURL(file);
+    setNewImagePreview(objectUrl);
+    setNewImageUrl('');
+    setIsUploadingImage(true);
+    try {
+      const result = await uploadQuestionImage(file);
+      if ('error' in result) {
+        setImageUploadError(result.error);
+        setNewImagePreview(null);
+      } else {
+        setNewImageUrl(result.url);
+      }
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -227,10 +180,15 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
     e.preventDefault();
     if (!newQuestion.trim()) return;
 
+    if (!newTopicChoice) {
+      alert('Vui lòng chọn chủ đề bài học.');
+      return;
+    }
+
     try {
-      const topicName = newTopic.trim() || 'Chủ đề chung';
-      let topicId = allTopics.find((t) => t.grade === newGrade && t.name === topicName)?.id;
-      if (!topicId) {
+      let topicId = newTopicChoice;
+      if (newTopicChoice === '__new__') {
+        const topicName = newTopicName.trim() || 'Chủ đề chung';
         topicId = await createTopic(newGrade, topicName);
       }
 
@@ -242,12 +200,18 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
         options: newOptions.map((opt, i) => opt.trim() || `Đáp án ${String.fromCharCode(65 + i)}`),
         correctIndex: newCorrectIndex,
         explanation: '',
+        imageUrl: newImageUrl || undefined,
       });
 
       await refreshQuestionBank();
       setShowAddModal(false);
       setNewQuestion('');
       setNewOptions(['', '', '', '']);
+      setNewTopicChoice('');
+      setNewTopicName('');
+      setNewImagePreview(null);
+      setNewImageUrl('');
+      setImageUploadError('');
       soundManager.playFanfare();
     } catch (err: any) {
       alert(`Không thể thêm câu hỏi: ${err.message || 'Lỗi không xác định'}`);
@@ -311,43 +275,71 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
     URL.revokeObjectURL(url);
   };
 
-  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ======= Popup nhập file Excel theo 3 bước: chọn khối -> chọn/tạo chủ đề -> chọn file =======
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importStep, setImportStep] = useState<1 | 2 | 3>(1);
+  const [importGrade, setImportGrade] = useState<number>(1);
+  const [importTopicChoice, setImportTopicChoice] = useState<string>(''); // id chủ đề có sẵn, hoặc '__new__'
+  const [importNewTopicName, setImportNewTopicName] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+
+  const openImportModal = () => {
+    setImportStep(1);
+    setImportGrade(typeof selectedGrade === 'number' ? selectedGrade : 1);
+    setImportTopicChoice('');
+    setImportNewTopicName('');
+    setShowImportModal(true);
+  };
+
+  const closeImportModal = () => {
+    setShowImportModal(false);
+  };
+
+  const handleImportFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (selectedGrade === 'all') {
-      alert('Vui lòng chọn 1 khối lớp cụ thể trước khi nhập file Excel (không được chọn "Tất cả các khối"), để câu hỏi được nhập đúng khối!');
-      e.target.value = '';
-      return;
-    }
-
     try {
+      setIsImporting(true);
+
+      // Xác định chủ đề đích đã chọn/tạo ở bước 2, luôn thuộc đúng khối đã chọn ở bước 1
+      let targetTopicId = importTopicChoice;
+      if (importTopicChoice === '__new__') {
+        const name = importNewTopicName.trim();
+        if (!name) {
+          alert('Vui lòng nhập tên chủ đề mới.');
+          return;
+        }
+        targetTopicId = await createTopic(importGrade, name);
+      }
+
+      if (!targetTopicId) {
+        alert('Vui lòng chọn chủ đề để nhập câu hỏi.');
+        return;
+      }
+
+      // An toàn: tuyệt đối không nhập vào chủ đề của khối khác
+      const topicsList = await listTopics();
+      const targetTopic = topicsList.find((t) => t.id === targetTopicId);
+      if (!targetTopic || targetTopic.grade !== importGrade) {
+        alert('Lỗi: Chủ đề được chọn không thuộc khối lớp đã chọn. Vui lòng thử lại.');
+        return;
+      }
+
       const parsed = await parseQuestionsExcelFile(file);
       if ('error' in parsed) {
         alert(parsed.error);
         return;
       }
 
-      const topicsList = await listTopics();
-      // Chỉ nhập vào chủ đề đang chọn (nếu đúng khối) hoặc chủ đề đầu tiên của khối đang chọn,
-      // tuyệt đối không nhập vào chủ đề của khối khác.
-      let targetTopicId: string | undefined;
-      const selectedTopic = topicsList.find((t) => t.id === selectedTopicId && t.grade === selectedGrade);
-      if (selectedTopic) {
-        targetTopicId = selectedTopic.id;
-      } else {
-        targetTopicId = topicsList.find((t) => t.grade === selectedGrade)?.id;
-      }
-      if (!targetTopicId) {
-        targetTopicId = await createTopic(selectedGrade, 'Chủ đề chung');
-      }
-
       await bulkInsertQuestions(targetTopicId, parsed.rows);
-      alert(`Nhập thành công ${parsed.rows.length} câu hỏi vào Khối ${selectedGrade}!`);
+      alert(`Nhập thành công ${parsed.rows.length} câu hỏi vào Khối ${importGrade}!`);
       await refreshQuestionBank();
+      closeImportModal();
     } catch (err: any) {
       alert(`Lỗi khi nhập Excel: ${err.message}`);
     } finally {
+      setIsImporting(false);
       e.target.value = '';
     }
   };
@@ -453,36 +445,27 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
         <div className="space-y-5 animate-in fade-in duration-150">
           {/* Action Bar & Grade filter */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
-            {/* Grade selector buttons */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-              {(['all', 1, 2, 3, 4, 5] as const).map((grade) => (
-                <button
-                  key={String(grade)}
-                  onClick={() => {
-                    setSelectedGrade(grade);
-                    setCurrentQuizIndex(0);
-                  }}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                    selectedGrade === grade
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  {grade === 'all' ? 'Tất cả các khối' : `Khối lớp ${grade}`}
-                </button>
-              ))}
+            {/* Grade selector dropdown */}
+            <div className="flex items-center gap-1.5">
+              <select
+                value={selectedGrade}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSelectedGrade(value === 'all' ? 'all' : Number(value));
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 border border-transparent focus:outline-hidden focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+              >
+                <option value="all">Tất cả các khối</option>
+                <option value={1}>Khối lớp 1</option>
+                <option value={2}>Khối lớp 2</option>
+                <option value={3}>Khối lớp 3</option>
+                <option value={4}>Khối lớp 4</option>
+                <option value={5}>Khối lớp 5</option>
+              </select>
             </div>
 
             {/* Quick Actions */}
             <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => handleStartPlay(0)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all active:scale-95 cursor-pointer"
-              >
-                <Play className="w-4 h-4 fill-white" />
-                <span>Chiếu trắc nghiệm cho cả lớp</span>
-              </button>
-
               {isAdmin && (
                 <>
                   <button
@@ -494,16 +477,13 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                     <span>Tải file mẫu</span>
                   </button>
 
-                  <label className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-colors cursor-pointer">
+                  <button
+                    onClick={openImportModal}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  >
                     <FileSpreadsheet className="w-4 h-4" />
                     <span>Nhập file Excel</span>
-                    <input
-                      type="file"
-                      accept=".xlsx,.xls"
-                      className="hidden"
-                      onChange={handleImportExcel}
-                    />
-                  </label>
+                  </button>
 
                   <button
                     onClick={() => setShowAddModal(true)}
@@ -555,6 +535,16 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                       {quiz.question}
                     </h4>
 
+                    {quiz.imageUrl && (
+                      <div className="mt-2 rounded-xl overflow-hidden border border-slate-200 max-h-48">
+                        <img
+                          src={quiz.imageUrl}
+                          alt={`Hình minh họa câu ${qIdx + 1}`}
+                          className="w-full h-full object-contain bg-slate-50"
+                        />
+                      </div>
+                    )}
+
                     <div className="mt-3 space-y-1.5">
                       {quiz.options.map((opt, oIdx) => (
                         <div
@@ -581,13 +571,6 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
 
                   <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end text-xs">
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleStartPlay(qIdx)}
-                        className="text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 cursor-pointer"
-                      >
-                        <Play className="w-3 h-3 fill-emerald-600" />
-                        <span>Chiếu</span>
-                      </button>
                       {isAdmin && (
                         <button
                           onClick={() => handleDeleteQuestion(quiz.id)}
@@ -822,124 +805,6 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
         </div>
       )}
 
-      {/* Classroom Live Projection Modal */}
-      {isPlayingMode && activeQuestion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
-            {/* Live Header */}
-            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
-                <span className="px-2.5 py-1 bg-emerald-500 text-white font-bold text-xs rounded-lg uppercase tracking-wider">
-                  Trắc nghiệm Tin học {activeQuestion.grade}
-                </span>
-                <span className="text-xs text-slate-400">
-                  Câu {currentQuizIndex + 1} / {filteredQuizzes.length}
-                </span>
-              </div>
-
-              {/* Timer Pill */}
-              <div className="flex items-center gap-4">
-                <div
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold ${
-                    timerSeconds <= 5
-                      ? 'bg-rose-500 text-white animate-pulse'
-                      : 'bg-slate-800 text-emerald-400'
-                  }`}
-                >
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>{timerSeconds}s</span>
-                </div>
-
-                <button
-                  onClick={() => setIsPlayingMode(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Question Screen */}
-            <div className="p-8 overflow-y-auto space-y-6 flex-1">
-              <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
-                  {activeQuestion.topicName || activeQuestion.topic}
-                </span>
-                <h3 className="text-2xl font-black text-slate-900 mt-2 leading-relaxed">
-                  {activeQuestion.question}
-                </h3>
-              </div>
-
-              {/* Options */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
-                {activeQuestion.options.map((opt, oIdx) => {
-                  const letter = String.fromCharCode(65 + oIdx);
-                  const isCorrect = oIdx === activeQuestion.correctIndex;
-                  const isChosen = selectedOption === oIdx;
-
-                  let optClass = 'bg-slate-50 border-slate-200 text-slate-800 hover:bg-slate-100 hover:border-slate-300';
-                  if (isAnswerRevealed) {
-                    if (isCorrect) {
-                      optClass = 'bg-emerald-50 border-emerald-400 text-emerald-900 font-bold ring-2 ring-emerald-400';
-                    } else if (isChosen) {
-                      optClass = 'bg-rose-50 border-rose-300 text-rose-800';
-                    }
-                  } else if (isChosen) {
-                    optClass = 'bg-blue-50 border-blue-400 text-blue-900 font-bold ring-2 ring-blue-300';
-                  }
-
-                  return (
-                    <button
-                      key={oIdx}
-                      onClick={() => handleSelectOptionInPlay(oIdx)}
-                      className={`p-4 rounded-2xl border-2 text-left text-sm transition-all flex items-start gap-3 cursor-pointer ${optClass}`}
-                    >
-                      <span className="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-700 flex items-center justify-center font-extrabold text-xs shrink-0 shadow-2xs">
-                        {letter}
-                      </span>
-                      <span className="leading-normal mt-0.5">{opt}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-            </div>
-
-            {/* Live Controller Footer */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
-              <button
-                onClick={handlePrevQuestion}
-                disabled={currentQuizIndex === 0}
-                className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200 disabled:opacity-30 transition-colors flex items-center gap-1.5"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Câu trước</span>
-              </button>
-
-              {!isAnswerRevealed ? (
-                <button
-                  onClick={handleRevealAnswer}
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
-                >
-                  Hiện đáp án đúng
-                </button>
-              ) : (
-                <span className="text-xs font-bold text-emerald-600">Đã công bố kết quả 🎉</span>
-              )}
-
-              <button
-                onClick={handleNextQuestion}
-                disabled={currentQuizIndex === filteredQuizzes.length - 1}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-30 cursor-pointer"
-              >
-                <span>Câu tiếp theo</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Detail Submission Modal */}
       {selectedSubmissionDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
@@ -995,7 +860,7 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
       {/* Add Question Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl shadow-xl border border-slate-200 w-full max-w-lg p-6 space-y-4">
+          <div className="bg-white rounded-3xl shadow-xl border border-slate-200 w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-slate-800 text-base">Thêm câu hỏi trắc nghiệm Tin học</h3>
 
             <form onSubmit={handleAddQuestionSubmit} className="space-y-3">
@@ -1016,13 +881,32 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Chủ đề bài học</label>
-                  <input
-                    type="text"
-                    value={newTopic}
-                    onChange={(e) => setNewTopic(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg"
+                  <select
+                    value={newTopicChoice}
+                    onChange={(e) => setNewTopicChoice(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
                     required
-                  />
+                  >
+                    <option value="">-- Chọn chủ đề --</option>
+                    {allTopics
+                      .filter((t) => t.grade === newGrade)
+                      .map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    <option value="__new__">+ Tạo chủ đề mới</option>
+                  </select>
+                  {newTopicChoice === '__new__' && (
+                    <input
+                      type="text"
+                      value={newTopicName}
+                      onChange={(e) => setNewTopicName(e.target.value)}
+                      placeholder="Nhập tên chủ đề mới"
+                      className="w-full mt-1.5 px-3 py-1.5 text-xs border border-slate-200 rounded-lg"
+                      required
+                    />
+                  )}
                 </div>
               </div>
 
@@ -1036,6 +920,38 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                   className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Hình ảnh minh họa (không bắt buộc)
+                </label>
+                <div className="flex items-center gap-3">
+                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold cursor-pointer">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Tải ảnh lên</span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      className="hidden"
+                      onChange={handleNewImageFileChange}
+                    />
+                  </label>
+                  {isUploadingImage && (
+                    <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Đang tải ảnh...
+                    </span>
+                  )}
+                </div>
+                {imageUploadError && (
+                  <p className="text-xs text-rose-600 mt-1">{imageUploadError}</p>
+                )}
+                {newImagePreview && (
+                  <div className="mt-2 relative max-w-[200px] rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                    <img src={newImagePreview} alt="Xem trước" className="w-full h-auto object-contain" />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -1087,6 +1003,157 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Import Excel Modal (3 bước: chọn khối -> chọn/tạo chủ đề -> chọn file) */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl shadow-xl border border-slate-200 w-full max-w-lg p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 text-base">Nhập câu hỏi từ file Excel</h3>
+              <button
+                onClick={closeImportModal}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Step indicator */}
+            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400">
+              <span className={importStep === 1 ? 'text-emerald-600' : ''}>1. Chọn khối</span>
+              <span>›</span>
+              <span className={importStep === 2 ? 'text-emerald-600' : ''}>2. Chọn chủ đề</span>
+              <span>›</span>
+              <span className={importStep === 3 ? 'text-emerald-600' : ''}>3. Chọn file</span>
+            </div>
+
+            {/* Step 1: chọn khối */}
+            {importStep === 1 && (
+              <div className="space-y-3">
+                <label className="block text-xs font-medium text-slate-600">Chọn khối lớp cần nhập câu hỏi</label>
+                <select
+                  value={importGrade}
+                  onChange={(e) => setImportGrade(Number(e.target.value))}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white"
+                >
+                  <option value={1}>Khối 1</option>
+                  <option value={2}>Khối 2</option>
+                  <option value={3}>Khối 3</option>
+                  <option value={4}>Khối 4</option>
+                  <option value={5}>Khối 5</option>
+                </select>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => {
+                      setImportTopicChoice('');
+                      setImportStep(2);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer"
+                  >
+                    <span>Tiếp theo</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: chọn / tạo chủ đề */}
+            {importStep === 2 && (
+              <div className="space-y-3">
+                <label className="block text-xs font-medium text-slate-600">
+                  Chọn chủ đề của Khối {importGrade} để nhập câu hỏi vào, hoặc tạo chủ đề mới
+                </label>
+                <select
+                  value={importTopicChoice}
+                  onChange={(e) => setImportTopicChoice(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white"
+                >
+                  <option value="">-- Chọn chủ đề --</option>
+                  {allTopics
+                    .filter((t) => t.grade === importGrade)
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  <option value="__new__">+ Tạo chủ đề mới</option>
+                </select>
+                {importTopicChoice === '__new__' && (
+                  <input
+                    type="text"
+                    value={importNewTopicName}
+                    onChange={(e) => setImportNewTopicName(e.target.value)}
+                    placeholder="Nhập tên chủ đề mới"
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg"
+                  />
+                )}
+                <div className="flex justify-between gap-2 pt-2">
+                  <button
+                    onClick={() => setImportStep(1)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Quay lại</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!importTopicChoice) {
+                        alert('Vui lòng chọn chủ đề hoặc tạo chủ đề mới.');
+                        return;
+                      }
+                      if (importTopicChoice === '__new__' && !importNewTopicName.trim()) {
+                        alert('Vui lòng nhập tên chủ đề mới.');
+                        return;
+                      }
+                      setImportStep(3);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer"
+                  >
+                    <span>Tiếp theo</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: chọn file Excel */}
+            {importStep === 3 && (
+              <div className="space-y-3">
+                <label className="block text-xs font-medium text-slate-600">
+                  Chọn file Excel câu hỏi để nhập vào chủ đề đã chọn (Khối {importGrade})
+                </label>
+                <label className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-colors cursor-pointer">
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>{isImporting ? 'Đang nhập...' : 'Chọn file Excel (.xlsx, .xls)'}</span>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    disabled={isImporting}
+                    onChange={handleImportFileSelected}
+                  />
+                </label>
+                {isImporting && (
+                  <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Đang xử lý file...
+                  </span>
+                )}
+                <div className="flex justify-start gap-2 pt-2">
+                  <button
+                    onClick={() => setImportStep(2)}
+                    disabled={isImporting}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Quay lại</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { CheckSquare, Square, Plus, BookOpen, Layers, Check, Loader2 } from 'lucide-react';
-import { listTopics, setTopicActive, createTopic, QuizTopicItem } from '../services/quizService';
+import { CheckSquare, Square, Plus, BookOpen, Layers, Check, Loader2, Lock, LockOpen } from 'lucide-react';
+import { listTopics, setTopicActive, setTopicForced, createTopic, QuizTopicItem } from '../services/quizService';
 
 interface QuizTopicActivationPanelProps {
   grade: number | 'all';
@@ -19,6 +19,7 @@ export const QuizTopicActivationPanel: React.FC<QuizTopicActivationPanelProps> =
   const [newTopicName, setNewTopicName] = useState('');
   const [newTopicGrade, setNewTopicGrade] = useState<number>(grade === 'all' ? 1 : grade);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [forcingTopicId, setForcingTopicId] = useState<string | null>(null);
 
   const fetchTopics = async () => {
     setLoading(true);
@@ -58,6 +59,33 @@ export const QuizTopicActivationPanel: React.FC<QuizTopicActivationPanelProps> =
     }
   };
 
+  const handleToggleForced = async (e: React.MouseEvent, topic: QuizTopicItem) => {
+    e.stopPropagation();
+    const nextForced = !topic.isForced;
+    setForcingTopicId(topic.id);
+    try {
+      if (nextForced) {
+        // Đảm bảo ràng buộc tối đa 1 chủ đề bị khóa mỗi khối: tắt các chủ đề khác
+        // cùng khối trước (tuần tự, tránh xung đột unique partial index ở DB),
+        // rồi mới khóa chủ đề này.
+        const othersSameGradeForced = topics.filter(
+          (t) => t.grade === topic.grade && t.id !== topic.id && t.isForced
+        );
+        for (const other of othersSameGradeForced) {
+          await setTopicForced(other.id, false);
+        }
+        await setTopicForced(topic.id, true);
+      } else {
+        await setTopicForced(topic.id, false);
+      }
+      await fetchTopics();
+    } catch (err: any) {
+      alert(`Không thể cập nhật trạng thái khóa chủ đề: ${err.message}`);
+    } finally {
+      setForcingTopicId(null);
+    }
+  };
+
   const handleToggleAll = async () => {
     const nextStatus = !allActive;
     try {
@@ -85,6 +113,7 @@ export const QuizTopicActivationPanel: React.FC<QuizTopicActivationPanelProps> =
           grade: newTopicGrade,
           name: newTopicName.trim(),
           isActive: false,
+          isForced: false,
           questionCount: 0,
         },
       ]);
@@ -156,47 +185,85 @@ export const QuizTopicActivationPanel: React.FC<QuizTopicActivationPanelProps> =
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
           {displayTopics.map((topic) => {
             const isSelected = selectedTopicId === topic.id;
+            const isForcingThis = forcingTopicId === topic.id;
             return (
               <div
                 key={topic.id}
-                onClick={() => onSelectTopic && onSelectTopic(isSelected ? null : topic.id)}
-                className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
-                  isSelected
+                className={`p-3 rounded-2xl border transition-all flex flex-col gap-2 ${
+                  topic.isForced
+                    ? 'border-amber-400 bg-amber-50/50 ring-1 ring-amber-400'
+                    : isSelected
                     ? 'border-emerald-500 bg-emerald-50/40 ring-1 ring-emerald-500'
                     : 'border-slate-200 hover:border-slate-300 bg-white'
                 }`}
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600">
-                      K{topic.grade}
-                    </span>
-                    <h4 className="text-xs font-bold text-slate-800 truncate" title={topic.name}>
-                      {topic.name}
-                    </h4>
+                <div
+                  onClick={() => onSelectTopic && onSelectTopic(isSelected ? null : topic.id)}
+                  className="flex items-center justify-between gap-2.5 cursor-pointer"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                        K{topic.grade}
+                      </span>
+                      <h4 className="text-xs font-bold text-slate-800 truncate" title={topic.name}>
+                        {topic.name}
+                      </h4>
+                      {topic.isForced && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 flex items-center gap-1 shrink-0">
+                          <Lock className="w-2.5 h-2.5" />
+                          Đang khóa
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {topic.questionCount} câu hỏi
+                    </p>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    {topic.questionCount} câu hỏi
-                  </p>
+
+                  {/* Checkbox toggle status */}
+                  <button
+                    type="button"
+                    onClick={(e) => handleToggleOne(e, topic)}
+                    className={`p-1.5 rounded-xl transition-all cursor-pointer ${
+                      topic.isActive
+                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                        : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                    }`}
+                    title={topic.isActive ? 'Đang mở cho học sinh thi' : 'Đang đóng'}
+                  >
+                    {topic.isActive ? (
+                      <CheckSquare className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <Square className="w-4 h-4 text-slate-400" />
+                    )}
+                  </button>
                 </div>
 
-                {/* Checkbox toggle status */}
-                <button
-                  type="button"
-                  onClick={(e) => handleToggleOne(e, topic)}
-                  className={`p-1.5 rounded-xl transition-all cursor-pointer ${
-                    topic.isActive
-                      ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                      : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                  }`}
-                  title={topic.isActive ? 'Đang mở cho học sinh thi' : 'Đang đóng'}
-                >
-                  {topic.isActive ? (
-                    <CheckSquare className="w-4 h-4 text-emerald-600" />
-                  ) : (
-                    <Square className="w-4 h-4 text-slate-400" />
-                  )}
-                </button>
+                {/* Công tắc khóa chủ đề - chỉ hiện với chủ đề đang active */}
+                {topic.isActive && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleToggleForced(e, topic)}
+                    disabled={isForcingThis}
+                    className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold border transition-all cursor-pointer disabled:opacity-50 ${
+                      topic.isForced
+                        ? 'bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200'
+                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+                    }`}
+                    title="Khóa chủ đề này, ẩn các chủ đề khác với học sinh"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {topic.isForced ? (
+                        <Lock className="w-3 h-3 text-amber-700" />
+                      ) : (
+                        <LockOpen className="w-3 h-3 text-slate-400" />
+                      )}
+                      <span>Khóa chủ đề này cho học sinh (ẩn các chủ đề khác)</span>
+                    </span>
+                    {isForcingThis && <Loader2 className="w-3 h-3 animate-spin shrink-0" />}
+                  </button>
+                )}
               </div>
             );
           })}
