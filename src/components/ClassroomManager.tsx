@@ -1694,12 +1694,14 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               <p className="text-xs text-slate-500 font-bold uppercase mb-3">Tất cả năm học</p>
               <div className="space-y-2">
                 {schoolYearsSummary.map((y) => (
-                  <div
+                  <button
                     key={y.id}
-                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl border text-sm ${
+                    type="button"
+                    onClick={() => setCurrentYear(y.name)}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border text-sm transition-colors cursor-pointer ${
                       y.name === currentYear
                         ? 'border-blue-200 bg-blue-50/60'
-                        : 'border-slate-200 bg-slate-50/60'
+                        : 'border-slate-200 bg-slate-50/60 hover:bg-slate-100 hover:border-slate-300'
                     }`}
                   >
                     <div className="flex items-center gap-2">
@@ -1722,7 +1724,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                         {y.totalStudents} học sinh
                       </span>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
