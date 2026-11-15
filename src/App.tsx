@@ -20,13 +20,11 @@ import { DataBackupModal } from './components/DataBackupModal';
 import {
   INITIAL_CLASSROOMS,
   INITIAL_STUDENTS,
-  INITIAL_RESOURCES,
   INITIAL_PERMISSIONS,
 } from './data/mockData';
 import {
   ActiveTab,
   Classroom,
-  DigitalResource,
   Student,
   StudentPermissions,
   UserAccount,
@@ -202,29 +200,11 @@ export default function App() {
     return () => window.removeEventListener('qllh_data_updated', loadClasses);
   }, [currentUser?.id]);
 
-  const [resources, setResources] = useState<DigitalResource[]>(() => {
-    try {
-      const saved = localStorage.getItem('qllh_digital_resources');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_RESOURCES;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('qllh_digital_resources', JSON.stringify(resources));
-  }, [resources]);
-
-  // Lắng nghe cập nhật trắc nghiệm, học liệu số, phân quyền từ các component con và đám mây
+  // Lắng nghe cập nhật phân quyền từ các component con và đám mây
   useEffect(() => {
     const handleGlobalDataSync = (e: any) => {
       const d = e?.detail?.data;
       if (d) {
-        if (d.resources && Array.isArray(d.resources) && d.resources.length > 0) {
-          setResources((prev) => (JSON.stringify(prev) === JSON.stringify(d.resources) ? prev : d.resources));
-        }
         if (d.permissions) {
           setPermissions((prev: StudentPermissions) => (JSON.stringify(prev) === JSON.stringify(d.permissions) ? prev : d.permissions));
         }
@@ -377,7 +357,6 @@ export default function App() {
           roomCode={roomCode}
           teacherUsername={currentUser.role === 'admin' || currentUser.role === 'teacher' ? currentUser.username : 'trungkienkd2025'}
           classrooms={classrooms}
-          resources={resources}
           onOpenTeacherLogin={() => setIsLoginModalOpen(true)}
         />
 
@@ -554,7 +533,7 @@ export default function App() {
             )}
 
             {activeTab === 'resources' && (
-              <DigitalResources resources={resources} setResources={setResources} isAdmin={isAdmin || currentUser?.role === 'teacher'} />
+              <DigitalResources isAdmin={isAdmin || currentUser?.role === 'teacher'} />
             )}
 
             {activeTab === 'games' && <GamesSection />}

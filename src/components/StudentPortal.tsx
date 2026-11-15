@@ -22,7 +22,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { QuizSubmission, Classroom, DigitalResource, Resource, Student } from '../types';
+import { QuizSubmission, Classroom, Resource, Student } from '../types';
 import { soundManager } from '../utils/audio';
 import { signInStudentWithRoomCode } from '../services/authService';
 import { listActiveTopics, startExamSession, submitExamSession, ExamQuestion } from '../services/examService';
@@ -33,7 +33,6 @@ interface StudentPortalProps {
   roomCode: string;
   teacherUsername?: string;
   classrooms: Classroom[];
-  resources: DigitalResource[];
   onOpenTeacherLogin: () => void;
   onRecordSubmission?: (sub: QuizSubmission) => void;
 }
@@ -42,7 +41,6 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
   roomCode,
   teacherUsername = 'trungkienkd2025',
   classrooms,
-  resources,
   onOpenTeacherLogin,
   onRecordSubmission,
 }) => {
@@ -81,11 +79,12 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
   const [isSubmittingExam, setIsSubmittingExam] = useState(false);
 
   // Digital resources & game preview modal
-  const [activeResourceModal, setActiveResourceModal] = useState<DigitalResource | null>(null);
+  const [activeResourceModal, setActiveResourceModal] = useState<Resource | null>(null);
   const [isGameModalOpen, setIsGameModalOpen] = useState(false);
   const [isResourcesListOpen, setIsResourcesListOpen] = useState(false);
   const [activeGamesList, setActiveGamesList] = useState<Resource[]>([]);
   const [activeLinksList, setActiveLinksList] = useState<Resource[]>([]);
+  const [activeVideosList, setActiveVideosList] = useState<Resource[]>([]);
 
   useEffect(() => {
     if (isGameModalOpen) {
@@ -99,6 +98,9 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
     if (isResourcesListOpen) {
       listResources('link', selectedGrade)
         .then((data) => setActiveLinksList(data.filter((l) => l.isActive !== false)))
+        .catch(() => {});
+      listResources('video', selectedGrade)
+        .then((data) => setActiveVideosList(data.filter((v) => v.isActive !== false)))
         .catch(() => {});
     }
   }, [isResourcesListOpen, selectedGrade]);
@@ -892,24 +894,19 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
             </div>
 
             <div className="p-6 overflow-y-auto space-y-3">
-              {resources.filter((r) => r.grade === selectedGrade).length === 0 ? (
+              {activeVideosList.length === 0 ? (
                 <div className="text-center py-8 text-slate-400 text-xs">
                   Chưa có video bài giảng nào cho Khối {selectedGrade}. Thầy cô sẽ tải lên sớm!
                 </div>
               ) : (
-                resources
-                  .filter((r) => r.grade === selectedGrade)
+                activeVideosList
                   .map((res) => (
                     <div
                       key={res.id}
                       className="p-4 rounded-2xl border border-slate-200 hover:border-sky-300 transition-all flex items-center justify-between gap-4"
                     >
                       <div className="space-y-1">
-                        <span className="text-[10px] font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded">
-                          {res.lessonNumber}
-                        </span>
                         <h4 className="font-bold text-slate-800 text-sm">{res.title}</h4>
-                        <p className="text-xs text-slate-500 line-clamp-1">{res.description}</p>
                       </div>
                       <button
                         onClick={() => setActiveResourceModal(res)}
@@ -968,21 +965,34 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 bg-slate-950 aspect-video flex items-center justify-center text-white">
-              {activeResourceModal.youtubeId ? (
-                <iframe
-                  className="w-full h-full rounded-xl"
-                  src={`https://www.youtube.com/embed/${activeResourceModal.youtubeId}?autoplay=1`}
-                  title={activeResourceModal.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              ) : (
-                <div className="text-center space-y-2">
-                  <Play className="w-12 h-12 text-sky-400 mx-auto" />
-                  <p className="text-xs text-slate-300">Video bài giảng tương tác</p>
-                </div>
-              )}
+            <div className="bg-black aspect-video flex items-center justify-center text-white">
+              {(() => {
+                const ytMatch = activeResourceModal.url.match(
+                  /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([\w-]{6,})/
+                );
+                if (ytMatch) {
+                  return (
+                    <iframe
+                      className="w-full h-full"
+                      src={`https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1`}
+                      title={activeResourceModal.title}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  );
+                }
+                if (activeResourceModal.url) {
+                  return (
+                    <video src={activeResourceModal.url} controls autoPlay className="w-full h-full object-contain" />
+                  );
+                }
+                return (
+                  <div className="text-center space-y-2 p-6">
+                    <Play className="w-12 h-12 text-sky-400 mx-auto" />
+                    <p className="text-xs text-slate-300">Chưa có đường dẫn video cho bài giảng này</p>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
