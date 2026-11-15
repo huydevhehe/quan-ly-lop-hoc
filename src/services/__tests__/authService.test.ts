@@ -11,6 +11,7 @@ vi.mock('../../lib/supabaseClient', () => {
         getSession: vi.fn(),
       },
       from: vi.fn(),
+      rpc: vi.fn(),
     },
   };
 });
@@ -42,11 +43,8 @@ describe('authService', () => {
       error: null,
     });
 
-    // Mock query classes trả về null/rỗng
-    const singleMock = vi.fn().mockResolvedValue({ data: null, error: null });
-    const eqMock = vi.fn().mockReturnValue({ single: singleMock });
-    const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
-    (supabase.from as any).mockReturnValue({ select: selectMock });
+    // Mock RPC tra cứu class id trả về null (không tìm thấy phòng)
+    (supabase.rpc as any).mockResolvedValue({ data: null, error: null });
 
     const result = await signInStudentWithRoomCode('MA-KHONG-TON-TAI', 'Nguyen Van A');
     expect('error' in result).toBe(true);
@@ -90,18 +88,11 @@ describe('authService', () => {
       error: null,
     });
 
-    const singleClassMock = vi.fn().mockResolvedValue({
-      data: { id: 'class-uuid-999' },
-      error: null,
-    });
-    const eqMock = vi.fn().mockReturnValue({ single: singleClassMock });
-    const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
+    (supabase.rpc as any).mockResolvedValue({ data: 'class-uuid-999', error: null });
+
     const insertMock = vi.fn().mockResolvedValue({ data: null, error: null });
 
     (supabase.from as any).mockImplementation((table: string) => {
-      if (table === 'classes') {
-        return { select: selectMock };
-      }
       if (table === 'room_sessions') {
         return { insert: insertMock };
       }

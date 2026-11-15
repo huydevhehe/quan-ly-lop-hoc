@@ -57,14 +57,15 @@ export async function signInStudentWithRoomCode(
     return { error: 'Không thể tạo phiên đăng nhập ẩn danh cho học sinh' };
   }
 
-  // Tra cứu xem có lớp nào khớp với room_code không
-  const { data: classData, error: classError } = await supabase
-    .from('classes')
-    .select('id')
-    .eq('room_code', normalizedCode)
-    .single();
+  // Tra cứu xem có lớp nào khớp với room_code không. Dùng RPC SECURITY DEFINER
+  // (find_class_id_by_room_code) thay vì SELECT thẳng vào bảng classes, vì RLS
+  // "classes_anon_select" chỉ cho phép xem lớp SAU KHI đã có room_sessions —
+  // ở bước tra cứu này thì chưa có, nên SELECT trực tiếp sẽ luôn bị chặn.
+  const { data: classId, error: classError } = await supabase.rpc('find_class_id_by_room_code', {
+    p_room_code: normalizedCode,
+  });
 
-  if (classError || !classData) {
+  if (classError || !classId) {
     // Không tìm thấy phòng -> Hủy phiên anon vừa tạo để tránh rác
     await supabase.auth.signOut();
     return { error: 'Mã phòng không đúng' };
@@ -73,7 +74,7 @@ export async function signInStudentWithRoomCode(
   // Lưu phiên vào bảng room_sessions
   const { error: sessionError } = await supabase.from('room_sessions').insert({
     auth_uid: authData.user.id,
-    class_id: classData.id,
+    class_id: classId,
   });
 
   if (sessionError) {
@@ -81,7 +82,7 @@ export async function signInStudentWithRoomCode(
     return { error: 'Lỗi khi lưu phiên vào phòng học' };
   }
 
-  return { classId: classData.id };
+  return { classId };
 }
 
 /**
