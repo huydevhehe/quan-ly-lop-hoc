@@ -11,8 +11,8 @@ import {
   X,
   Share2
 } from 'lucide-react';
-import { DigitalResource } from '../types';
-import { listResources, createResource } from '../services/resourcesService';
+import { DigitalResource, Resource } from '../types';
+import { listResources, createResource, deleteResource } from '../services/resourcesService';
 import { SaveLinkForm } from './resources/SaveLinkForm';
 
 interface DigitalResourcesProps {
@@ -24,6 +24,7 @@ const PLACEHOLDER_THUMBNAIL =
 
 export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = true }) => {
   const [resources, setResources] = useState<DigitalResource[]>([]);
+  const [links, setLinks] = useState<Resource[]>([]);
   const [selectedGrade, setSelectedGrade] = useState<number | 'all'>('all');
   const [activeVideo, setActiveVideo] = useState<DigitalResource | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -36,9 +37,9 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
 
   const refreshResources = async () => {
     try {
-      const data = await listResources('video');
+      const [videoData, linkData] = await Promise.all([listResources('video'), listResources('link')]);
       setResources(
-        data.map((r) => ({
+        videoData.map((r) => ({
           id: r.id,
           grade: r.grade || 1,
           title: r.title,
@@ -52,6 +53,7 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
           materialsCount: 0,
         }))
       );
+      setLinks(linkData);
     } catch (err) {
       console.error('Lỗi tải học liệu số:', err);
     }
@@ -64,6 +66,19 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
   const filteredResources = resources.filter(
     (res) => selectedGrade === 'all' || res.grade === selectedGrade
   );
+  const filteredLinks = links.filter(
+    (link) => selectedGrade === 'all' || link.grade === selectedGrade
+  );
+
+  const handleDeleteLink = async (id: string) => {
+    if (!confirm('Xóa liên kết này?')) return;
+    try {
+      await deleteResource(id);
+      await refreshResources();
+    } catch (err: any) {
+      alert(`Không thể xóa liên kết: ${err.message || 'Lỗi không xác định'}`);
+    }
+  };
 
   const handleAddResource = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,6 +170,44 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
           {filteredResources.length} video bài giảng
         </span>
       </div>
+
+      {/* Saved Website Links (separate from video lessons) */}
+      {filteredLinks.length > 0 && (
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-2.5">
+          <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+            <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+            Liên kết trang web đã lưu ({filteredLinks.length})
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {filteredLinks.map((link) => (
+              <div
+                key={link.id}
+                className="flex items-center justify-between gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl"
+              >
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 min-w-0 flex-1 hover:text-emerald-700"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span className="text-xs font-semibold text-slate-800 truncate">{link.title}</span>
+                  <span className="text-[10px] text-slate-400 shrink-0">Khối {link.grade}</span>
+                </a>
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDeleteLink(link.id)}
+                    className="text-slate-400 hover:text-red-500 transition-colors p-1 shrink-0"
+                    title="Xóa liên kết"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Resources Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">

@@ -10,7 +10,6 @@ import {
   ArrowRight,
   ArrowLeft,
   X,
-  Sparkles,
   BookOpen,
   FileSpreadsheet,
   Trash2,
@@ -141,7 +140,6 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
   const [newQuestion, setNewQuestion] = useState('');
   const [newOptions, setNewOptions] = useState(['', '', '', '']);
   const [newCorrectIndex, setNewCorrectIndex] = useState(0);
-  const [newExplanation, setNewExplanation] = useState('');
 
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
 
@@ -243,14 +241,13 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
         question: newQuestion.trim(),
         options: newOptions.map((opt, i) => opt.trim() || `Đáp án ${String.fromCharCode(65 + i)}`),
         correctIndex: newCorrectIndex,
-        explanation: newExplanation.trim() || 'Chúc mừng các em đã trả lời chính xác!',
+        explanation: '',
       });
 
       await refreshQuestionBank();
       setShowAddModal(false);
       setNewQuestion('');
       setNewOptions(['', '', '', '']);
-      setNewExplanation('');
       soundManager.playFanfare();
     } catch (err: any) {
       alert(`Không thể thêm câu hỏi: ${err.message || 'Lỗi không xác định'}`);
@@ -318,6 +315,12 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (selectedGrade === 'all') {
+      alert('Vui lòng chọn 1 khối lớp cụ thể trước khi nhập file Excel (không được chọn "Tất cả các khối"), để câu hỏi được nhập đúng khối!');
+      e.target.value = '';
+      return;
+    }
+
     try {
       const parsed = await parseQuestionsExcelFile(file);
       if ('error' in parsed) {
@@ -326,13 +329,21 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
       }
 
       const topicsList = await listTopics();
-      let targetTopicId = topicsList[0]?.id;
+      // Chỉ nhập vào chủ đề đang chọn (nếu đúng khối) hoặc chủ đề đầu tiên của khối đang chọn,
+      // tuyệt đối không nhập vào chủ đề của khối khác.
+      let targetTopicId: string | undefined;
+      const selectedTopic = topicsList.find((t) => t.id === selectedTopicId && t.grade === selectedGrade);
+      if (selectedTopic) {
+        targetTopicId = selectedTopic.id;
+      } else {
+        targetTopicId = topicsList.find((t) => t.grade === selectedGrade)?.id;
+      }
       if (!targetTopicId) {
-        targetTopicId = await createTopic(selectedGrade === 'all' ? 1 : selectedGrade, 'Chủ đề chung');
+        targetTopicId = await createTopic(selectedGrade, 'Chủ đề chung');
       }
 
       await bulkInsertQuestions(targetTopicId, parsed.rows);
-      alert(`Nhập thành công ${parsed.rows.length} câu hỏi!`);
+      alert(`Nhập thành công ${parsed.rows.length} câu hỏi vào Khối ${selectedGrade}!`);
       await refreshQuestionBank();
     } catch (err: any) {
       alert(`Lỗi khi nhập Excel: ${err.message}`);
@@ -568,10 +579,7 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-slate-400 text-[11px] truncate max-w-[200px]">
-                      {quiz.explanation}
-                    </span>
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end text-xs">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleStartPlay(qIdx)}
@@ -895,16 +903,6 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                 })}
               </div>
 
-              {/* Explanation box when revealed */}
-              {isAnswerRevealed && (
-                <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl text-xs text-emerald-900 space-y-1 animate-in fade-in">
-                  <div className="flex items-center gap-1.5 font-bold text-emerald-700">
-                    <Sparkles className="w-4 h-4 text-emerald-600" />
-                    <span>Giải thích đáp án chính xác:</span>
-                  </div>
-                  <p className="leading-relaxed pl-5">{activeQuestion.explanation}</p>
-                </div>
-              )}
             </div>
 
             {/* Live Controller Footer */}
@@ -1072,16 +1070,6 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                 ))}
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Giải thích lời giải</label>
-                <input
-                  type="text"
-                  placeholder="Lý do phương án này đúng..."
-                  value={newExplanation}
-                  onChange={(e) => setNewExplanation(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg"
-                />
-              </div>
 
               <div className="flex justify-end gap-2 pt-2">
                 <button
