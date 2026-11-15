@@ -578,9 +578,12 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
 
   // Danh sách lớp trong năm học
   const filteredClasses = useMemo(() => {
-    return [...visibleClassesInCurrentYear].sort((a: ClassItem, b: ClassItem) =>
-      a.name.localeCompare(b.name, 'vi', { numeric: true })
-    );
+    const getGradeNum = (c: ClassItem) => parseInt(String(c.grade).replace(/[^0-9]/g, ''), 10) || 0;
+    return [...visibleClassesInCurrentYear].sort((a: ClassItem, b: ClassItem) => {
+      const gradeDiff = getGradeNum(a) - getGradeNum(b);
+      if (gradeDiff !== 0) return gradeDiff;
+      return a.name.localeCompare(b.name, 'vi', { numeric: true });
+    });
   }, [visibleClassesInCurrentYear]);
 
   // Tự động đồng bộ currentClassId khi đổi tài khoản hoặc đổi năm học
