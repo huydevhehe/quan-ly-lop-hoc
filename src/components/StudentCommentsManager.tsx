@@ -749,10 +749,9 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
     );
   };
 
-  // Accordion: section nào đang mở (mặc định mở cấu hình + menu nạp Excel H/T của khối đang chọn,
-  // thu gọn sẵn phần xem trước bảng dài để trang đỡ dài khi mới mở)
+  // Accordion: mặc định TẤT CẢ thu gọn, bấm vào tiêu đề mới mở ra (theo yêu cầu chủ dự án)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    () => new Set(['config', 'uploadMenu', 'export'])
+    () => new Set()
   );
 
   const toggleSection = (key: string) => {
