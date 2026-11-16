@@ -25,6 +25,8 @@ import { StudentCommentsManager } from './StudentCommentsManager';
 import { Award } from 'lucide-react';
 import { SaveLinkForm } from './resources/SaveLinkForm';
 import { listResources, deleteResource } from '../services/resourcesService';
+import { upsertStudents } from '../services/studentsService';
+import { translateSupabaseError } from '../utils/errorMessages';
 import { Resource } from '../types';
 
 interface UtilitiesSectionProps {
@@ -93,6 +95,8 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
     `Nguyễn Gia Khiêm\tNam\t15/04/2016\nPhạm Quỳnh Chi\tNữ\t20/09/2016\nVũ Đức Minh\tNam\t08/11/2016\nLê Thùy Dung\tNữ\t02/03/2016`
   );
   const [importSuccess, setImportSuccess] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
 
   const currentClass = classrooms.find((c) => c.id === selectedClassId) || classrooms[0];
   const classStudents = students.filter((s) => s.classId === selectedClassId);
@@ -171,37 +175,38 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
   };
 
   // Excel import logic
-  const handleParseAndImport = () => {
+  const handleParseAndImport = async () => {
+    setImportError('');
     const lines = excelText.trim().split('\n');
-    const newParsedStudents: Student[] = [];
+    const toInsert: { code: string; name: string; avatar: string }[] = [];
 
     lines.forEach((line, index) => {
       const parts = line.split(/[\t,;]+/);
       if (parts.length >= 1 && parts[0].trim()) {
         const name = parts[0].trim();
         const gender: 'Nam' | 'Nữ' = parts[1]?.toLowerCase().includes('nữ') ? 'Nữ' : 'Nam';
-        const dob = parts[2]?.trim() || '01/01/2016';
 
-        newParsedStudents.push({
-          id: `imp_${Date.now()}_${index}`,
+        toInsert.push({
           code: `HS${(classStudents.length + index + 1).toString().padStart(3, '0')}`,
           name,
-          gender,
-          dob,
           avatar: gender === 'Nam' ? '👦' : '👧',
-          classId: selectedClassId,
-          attendance: 'present',
-          stars: 0,
-          speeches: 0,
         });
       }
     });
 
-    if (newParsedStudents.length > 0) {
-      setStudents((prev) => [...prev, ...newParsedStudents]);
+    if (toInsert.length === 0) return;
+
+    setIsImporting(true);
+    try {
+      const inserted = await upsertStudents(selectedClassId, toInsert);
+      setStudents((prev) => [...prev, ...inserted]);
       setImportSuccess(true);
       soundManager.playFanfare();
       setTimeout(() => setImportSuccess(false), 3000);
+    } catch (err: any) {
+      setImportError(translateSupabaseError(err, 'Không thể nhập danh sách học sinh. Vui lòng kiểm tra lại dữ liệu và thử lại.'));
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -544,6 +549,9 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
             <p className="text-[11px] text-slate-400">
               Hệ thống tự động phân tích dấu Tab, dấu phẩy hoặc dấu chấm phẩy giữa các cột.
             </p>
+            {importError && (
+              <p className="text-xs font-bold text-rose-600">{importError}</p>
+            )}
           </div>
 
           <div className="flex items-center justify-between pt-2">
@@ -560,10 +568,11 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
               )}
               <button
                 onClick={handleParseAndImport}
-                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+                disabled={isImporting}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 <Upload className="w-4 h-4" />
-                <span>Nhập ngay vào lớp</span>
+                <span>{isImporting ? 'Đang nhập...' : 'Nhập ngay vào lớp'}</span>
               </button>
             </div>
           </div>
