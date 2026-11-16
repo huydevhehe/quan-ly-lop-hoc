@@ -232,8 +232,10 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       setCurrentYear((prev) => prev || classYears[0] || '');
       if (mapped.length > 0) {
         if (!currentClassId) {
+          // Chỉ chọn lớp dự phòng CỤC BỘ, không gọi onSelectClassExternal — kênh đó dành
+          // cho người dùng chủ động chọn lớp và sẽ ép currentView về 'detail', khiến việc
+          // mới vào màn "Quản lý lớp học" bị nhảy thẳng vào 1 lớp thay vì ở lại màn danh sách.
           setCurrentClassId(mapped[0].id);
-          if (onSelectClassExternal) onSelectClassExternal(mapped[0].id);
         }
       } else {
         setCurrentClassId('');

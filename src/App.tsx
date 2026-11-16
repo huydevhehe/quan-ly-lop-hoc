@@ -32,7 +32,7 @@ import {
 import { soundManager } from './utils/audio';
 import confetti from 'canvas-confetti';
 import { restoreSession, signOut } from './services/authService';
-import { listMyClasses } from './services/classesService';
+import { listMyClasses, updateClass } from './services/classesService';
 import { listStudentsByClass } from './services/studentsService';
 
 const GUEST_ACCOUNT: UserAccount = {
@@ -61,7 +61,6 @@ export default function App() {
     } catch {}
     return 'home';
   });
-  const [roomCode, setRoomCode] = useState('F08AF1');
   const [selectedYear, setSelectedYear] = useState(() => {
     return localStorage.getItem('qllh_current_year') || '';
   });
@@ -185,14 +184,19 @@ export default function App() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
+  // Mã phòng thật của lớp đang chọn (mỗi lớp 1 mã riêng, lấy từ Supabase), không phải mã giả cố định
+  const currentRoomCode = classrooms.find((c) => c.id === selectedClassId)?.roomCode || '';
 
   useEffect(() => {
     const loadClasses = async () => {
       try {
         const cls = await listMyClasses();
         setClassrooms(cls);
-        if (cls.length > 0 && !selectedClassId) {
-          setSelectedClassId(cls[0].id);
+        if (cls.length > 0) {
+          // Dùng functional update để đọc selectedClassId MỚI NHẤT thay vì closure cũ của
+          // listener này (gắn 1 lần lúc đăng nhập) — tránh việc nó tự chọn lại lớp đầu tiên
+          // mỗi khi có sự kiện qllh_data_updated, ghi đè lên lựa chọn "về danh sách" của người dùng.
+          setSelectedClassId((prev) => prev || cls[0].id);
         }
       } catch (err) {
         console.error('Lỗi tải lớp học trong App:', err);
@@ -303,14 +307,21 @@ export default function App() {
     }));
   };
 
-  const handleRegenerateRoomCode = () => {
+  const handleRegenerateRoomCode = async () => {
+    if (!selectedClassId) return;
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let newCode = '';
     for (let i = 0; i < 6; i++) {
       newCode += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    setRoomCode(newCode);
-    soundManager.playStarSound();
+    try {
+      await updateClass(selectedClassId, { roomCode: newCode });
+      const cls = await listMyClasses();
+      setClassrooms(cls);
+      soundManager.playStarSound();
+    } catch (err: any) {
+      alert(err.message || 'Không thể đổi mã phòng, vui lòng thử lại.');
+    }
   };
 
   const handleRewardStudentFromPicker = (studentId: string) => {
@@ -368,7 +379,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex flex-col antialiased">
         <StudentPortal
-          roomCode={roomCode}
+          roomCode={currentRoomCode}
           teacherUsername={currentUser.role === 'admin' || currentUser.role === 'teacher' ? currentUser.username : 'trungkienkd2025'}
           classrooms={classrooms}
           onOpenTeacherLogin={() => setIsLoginModalOpen(true)}
@@ -401,7 +412,7 @@ export default function App() {
 
       <Header
         onToggleSidebar={() => setIsMobileSidebarOpen(true)}
-        roomCode={roomCode}
+        roomCode={currentRoomCode}
         onOpenRoomModal={() => setIsRoomModalOpen(true)}
         teacherName={teacherName}
         onOpenDownloadGuide={() => setIsDownloadModalOpen(true)}
@@ -420,7 +431,7 @@ export default function App() {
         <Sidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          roomCode={roomCode}
+          roomCode={currentRoomCode}
           onOpenRoomModal={() => setIsRoomModalOpen(true)}
           isMobileOpen={isMobileSidebarOpen}
           setIsMobileOpen={setIsMobileSidebarOpen}
@@ -472,7 +483,7 @@ export default function App() {
                   }
                   setActiveTab(tab);
                 }}
-                roomCode={roomCode}
+                roomCode={currentRoomCode}
                 onOpenRoomModal={() => setIsRoomModalOpen(true)}
                 teacherName={teacherName}
                 onOpenDownloadGuide={() => setIsDownloadModalOpen(true)}
@@ -553,7 +564,7 @@ export default function App() {
       <RoomCodeModal
         isOpen={isRoomModalOpen}
         onClose={() => setIsRoomModalOpen(false)}
-        roomCode={roomCode}
+        roomCode={currentRoomCode}
         onRegenerateCode={handleRegenerateRoomCode}
         teacherName={teacherName}
       />

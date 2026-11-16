@@ -14,6 +14,7 @@ export interface UpdateClassInput {
   grade?: number;
   isOpen?: boolean;
   schoolYearId?: string;
+  roomCode?: string;
 }
 
 /**
@@ -111,6 +112,7 @@ export async function updateClass(id: string, patch: UpdateClassInput): Promise<
   if (patch.grade !== undefined) updatePayload.grade = patch.grade;
   if (patch.isOpen !== undefined) updatePayload.is_open = patch.isOpen;
   if (patch.schoolYearId !== undefined) updatePayload.school_year_id = patch.schoolYearId;
+  if (patch.roomCode !== undefined) updatePayload.room_code = patch.roomCode.trim().toUpperCase();
 
   const { error } = await supabase
     .from('classes')

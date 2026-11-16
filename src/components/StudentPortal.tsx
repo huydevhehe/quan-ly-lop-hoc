@@ -404,19 +404,21 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                 <span className="text-lg">🚀</span>
               </button>
 
-              {/* Quick helper for students */}
-              <div className="pt-2 text-center">
-                <p className="text-xs text-slate-400">
-                  Mã phòng học hiện tại của Thầy Kiên:{' '}
-                  <button
-                    type="button"
-                    onClick={() => setEnteredCode(roomCode)}
-                    className="font-mono font-bold text-sky-600 hover:underline bg-sky-50 px-2 py-0.5 rounded border border-sky-100"
-                  >
-                    {roomCode}
-                  </button>
-                </p>
-              </div>
+              {/* Quick helper for students — chỉ hiện khi có mã phòng thật (vd giáo viên đang xem thử Cổng Học sinh) */}
+              {roomCode && (
+                <div className="pt-2 text-center">
+                  <p className="text-xs text-slate-400">
+                    Mã phòng học hiện tại của {teacherUsername}:{' '}
+                    <button
+                      type="button"
+                      onClick={() => setEnteredCode(roomCode)}
+                      className="font-mono font-bold text-sky-600 hover:underline bg-sky-50 px-2 py-0.5 rounded border border-sky-100"
+                    >
+                      {roomCode}
+                    </button>
+                  </p>
+                </div>
+              )}
             </form>
           </div>
         </div>

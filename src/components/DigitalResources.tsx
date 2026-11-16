@@ -152,22 +152,21 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
         />
       )}
 
-      {/* Grade Selector Tabs */}
-      <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-2xs overflow-x-auto">
-        {(['all', 1, 2, 3, 4, 5] as const).map((grade) => (
-          <button
-            key={String(grade)}
-            onClick={() => setSelectedGrade(grade)}
-            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
-              selectedGrade === grade
-                ? 'bg-purple-600 text-white shadow-2xs'
-                : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            {grade === 'all' ? 'Tất cả các khối' : `Khối lớp ${grade}`}
-          </button>
-        ))}
-        <span className="text-xs text-slate-400 ml-auto mr-3 hidden sm:inline">
+      {/* Grade Selector Dropdown */}
+      <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-2xs">
+        <select
+          value={selectedGrade}
+          onChange={(e) => setSelectedGrade(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white text-slate-700 cursor-pointer"
+        >
+          <option value="all">Tất cả các khối</option>
+          {[1, 2, 3, 4, 5].map((grade) => (
+            <option key={grade} value={grade}>
+              Khối lớp {grade}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-slate-400 ml-auto mr-1 hidden sm:inline">
           {filteredResources.length} video bài giảng
         </span>
       </div>
