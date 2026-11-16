@@ -36,6 +36,7 @@ import {
   saveWeekEvaluation,
 } from '../services/attendanceService';
 import { getClassScores, saveScore } from '../services/scoresService';
+import { getMyTimetable, saveMyTimetable } from '../services/timetableService';
 import { RandomPickerModal } from './RandomPickerModal';
 
 export interface ClassItem {
@@ -204,10 +205,27 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   // Grades data
   const [gradeData, setGradeData] = useState<Record<string, GradeRecord>>({});
 
-  // Timetable state
+  // Timetable state (luu that len Supabase theo tai khoan giao vien, khong chi o local nua)
   const [timetable, setTimetable] = useState<string[][]>(() =>
     Array(10).fill(null).map(() => Array(5).fill(''))
   );
+  const [timetableSaveState, setTimetableSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const timetableSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timetableLoadedRef = useRef(false);
+
+  // Tai thoi khoa bieu that tu Supabase khi mo man "Quan ly lop hoc"
+  useEffect(() => {
+    getMyTimetable()
+      .then((grid) => {
+        if (grid && grid.length > 0) {
+          setTimetable(Array(10).fill(null).map((_, i) => Array(5).fill(null).map((_, j) => grid[i]?.[j] || '')));
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        timetableLoadedRef.current = true;
+      });
+  }, []);
 
   const fetchClasses = async () => {
     try {
@@ -762,12 +780,21 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     setTimeout(() => setSaveEvalSuccess(false), 1500);
   };
 
-  // Action: Timetable cell update
+  // Action: Timetable cell update - debounce luu that len Supabase (khong chi doi local nua)
   const handleTimetableChange = (rowIdx: number, colIdx: number, value: string) => {
     if (!canManage) return;
     setTimetable((prev) => {
       const next = prev.map((row) => [...row]);
       next[rowIdx][colIdx] = value;
+
+      if (timetableSaveTimerRef.current) clearTimeout(timetableSaveTimerRef.current);
+      setTimetableSaveState('saving');
+      timetableSaveTimerRef.current = setTimeout(() => {
+        saveMyTimetable(next)
+          .then(() => setTimetableSaveState('saved'))
+          .catch(() => setTimetableSaveState('error'));
+      }, 800);
+
       return next;
     });
   };
@@ -1554,10 +1581,22 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 <Calendar className="w-5 h-5 text-blue-600" />
                 <span>Thời khóa biểu cá nhân</span>
               </h3>
-              <span className="inline-flex items-center gap-1.5 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full font-bold">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Đã bật tự động lưu</span>
-              </span>
+              {timetableSaveState === 'saving' ? (
+                <span className="inline-flex items-center gap-1.5 text-xs bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full font-bold">
+                  <Clock className="w-3.5 h-3.5 animate-spin" />
+                  <span>Đang lưu...</span>
+                </span>
+              ) : timetableSaveState === 'error' ? (
+                <span className="inline-flex items-center gap-1.5 text-xs bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1 rounded-full font-bold">
+                  <XCircle className="w-3.5 h-3.5" />
+                  <span>Lưu lỗi, thử lại</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full font-bold">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{timetableSaveState === 'saved' ? 'Đã lưu' : 'Tự động lưu khi gõ'}</span>
+                </span>
+              )}
             </div>
 
             <div className="overflow-x-auto">
@@ -1814,7 +1853,14 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 pb-4">
               {filteredClasses.map((cls: ClassItem) => {
-                const hsCount = studentsData.filter((s: StudentRecord) => s.classId === cls.id).length;
+                // `studentsData` chỉ được tải lazy cho đúng 1 lớp đang mở (currentClassId) nên không
+                // thể dùng nó để đếm cho MỌI lớp trong danh sách - sẽ ra 0 hết trừ lớp đang mở.
+                // Lớp đang mở: dùng số liệu "sống" (cập nhật ngay khi thêm/xóa học sinh).
+                // Các lớp khác: dùng totalStudents đã tổng hợp sẵn từ Supabase khi tải danh sách lớp.
+                const hsCount =
+                  cls.id === currentClassId
+                    ? studentsData.filter((s: StudentRecord) => s.classId === cls.id).length
+                    : cls.totalStudents ?? 0;
                 const gradeColor = getGradeAccentColor(cls.grade);
                 return (
                   <div

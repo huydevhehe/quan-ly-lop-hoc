@@ -132,8 +132,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     <div className="w-full max-w-6xl mx-auto space-y-7">
       {/* Greeting Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <span className="text-slate-500 text-sm font-medium">Xin chào,</span>
+        <div>
+          <p className="text-slate-500 text-sm font-medium mb-0.5">Xin chào,</p>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
             <span>{isStaff ? teacherName : (currentUser?.fullName || 'Học sinh')}</span>
             {!isStaff && (
@@ -165,30 +165,30 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         {/* Top Blue Indicator Bar (matches the blue line at top in screenshot) */}
         <div className="h-1 bg-[#2563eb] w-full" />
 
-        <div className="p-6 md:p-8 flex flex-col items-center justify-center text-center relative">
-          <span className="text-[#2563eb] font-bold text-xs uppercase tracking-wider mb-2">
+        <div className="p-4 md:p-5 flex flex-col items-center justify-center text-center relative">
+          <span className="text-[#2563eb] font-bold text-[11px] uppercase tracking-wider mb-1.5">
             MÃ PHÒNG HỌC
           </span>
 
-          <div className="flex items-center gap-3">
-            <span className="text-4xl sm:text-5xl font-black text-slate-900 tracking-wider font-mono select-all">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-wider font-mono select-all">
               {roomCode}
             </span>
             <button
               onClick={handleCopyCode}
-              className="p-2 sm:p-2.5 rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 text-slate-500 hover:text-blue-600 transition-colors shadow-2xs"
+              className="p-1.5 sm:p-2 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 text-slate-500 hover:text-blue-600 transition-colors shadow-2xs"
               title="Sao chép mã phòng"
             >
               {copied ? (
-                <Check className="w-5 h-5 text-emerald-600" />
+                <Check className="w-4 h-4 text-emerald-600" />
               ) : (
-                <Copy className="w-5 h-5" />
+                <Copy className="w-4 h-4" />
               )}
             </button>
           </div>
 
           {/* Quick interactive actions under room code */}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
             {onSwitchToStudentPortal && (
               <button
                 onClick={onSwitchToStudentPortal}

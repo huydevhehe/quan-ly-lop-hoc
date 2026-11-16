@@ -20,6 +20,7 @@ import {
   Trash2,
   Plus,
   RefreshCw,
+  DatabaseBackup,
 } from 'lucide-react';
 import { ActiveTab, StudentPermissions, UserAccount } from '../types';
 import { listMyClasses } from '../services/classesService';
@@ -475,6 +476,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             )}
           </div>
+
+          {/* Backup toan bo du lieu - phong khi can khoi phuc lai tu may khac hoac lo mat du lieu */}
+          {onOpenBackup && (
+            <button
+              type="button"
+              onClick={onOpenBackup}
+              className="w-full p-2.5 rounded-xl bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/60 text-slate-700 hover:text-emerald-700 transition-all shadow-2xs flex items-center justify-center gap-2 text-xs font-bold cursor-pointer"
+              title="Tải về 1 file sao lưu toàn bộ dữ liệu (lớp, học sinh, điểm, điểm danh...) hoặc khôi phục từ file đã lưu"
+            >
+              <DatabaseBackup className="w-3.5 h-3.5" />
+              <span>Sao lưu / Khôi phục dữ liệu</span>
+            </button>
+          )}
 
           {/* Room Code Box */}
           <div

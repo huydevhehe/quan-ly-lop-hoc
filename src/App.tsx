@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -182,7 +182,29 @@ export default function App() {
 
   // Core application data state theo tài khoản người dùng
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem('qllh_current_class_id');
+      if (saved && saved !== '__none__') return saved;
+    } catch {}
+    return null;
+  });
+  // Co key trong localStorage (ke ca '__none__' - nghia la nguoi dung chu dong ve man danh sach)
+  // tuc la da tung chon 1 lan roi, khong duoc tu dong ep chon lop dau tien nua sau nay (vd khi F5).
+  const hasPickedClassOnceRef = useRef<boolean>(
+    (() => {
+      try {
+        return localStorage.getItem('qllh_current_class_id') !== null;
+      } catch {
+        return false;
+      }
+    })()
+  );
+  useEffect(() => {
+    try {
+      localStorage.setItem('qllh_current_class_id', selectedClassId || '__none__');
+    } catch {}
+  }, [selectedClassId]);
   const [students, setStudents] = useState<Student[]>([]);
   // Mã phòng thật của lớp đang chọn (mỗi lớp 1 mã riêng, lấy từ Supabase), không phải mã giả cố định
   const currentRoomCode = classrooms.find((c) => c.id === selectedClassId)?.roomCode || '';
@@ -196,7 +218,14 @@ export default function App() {
           // Dùng functional update để đọc selectedClassId MỚI NHẤT thay vì closure cũ của
           // listener này (gắn 1 lần lúc đăng nhập) — tránh việc nó tự chọn lại lớp đầu tiên
           // mỗi khi có sự kiện qllh_data_updated, ghi đè lên lựa chọn "về danh sách" của người dùng.
-          setSelectedClassId((prev) => prev || cls[0].id);
+          // Chỉ tự chọn lớp đầu tiên ở LẦN ĐẦU TIÊN chưa từng chọn gì (chưa có key trong localStorage);
+          // nếu người dùng đã từng chủ động bấm "về danh sách" (kể cả sau khi F5 lại trang) thì giữ nguyên.
+          setSelectedClassId((prev) => {
+            if (prev) return prev;
+            if (hasPickedClassOnceRef.current) return null;
+            hasPickedClassOnceRef.current = true;
+            return cls[0].id;
+          });
         }
       } catch (err) {
         console.error('Lỗi tải lớp học trong App:', err);
@@ -276,6 +305,7 @@ export default function App() {
       .then((cls) => {
         setClassrooms(cls);
         if (cls.length > 0) {
+          hasPickedClassOnceRef.current = true;
           setSelectedClassId(cls[0].id);
         }
       })
