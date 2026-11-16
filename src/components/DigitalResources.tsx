@@ -181,9 +181,9 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
         </span>
       </div>
 
-      {/* Saved Website Links (separate from video lessons) */}
+      {/* Saved Website Links (separate from video lessons) - to bang voi the video ben duoi */}
       {filteredLinks.length > 0 && (
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+        <div className="space-y-3">
           <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide flex items-center gap-2">
             <span className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
               <Share2 className="w-4 h-4 text-emerald-600" />
@@ -193,50 +193,75 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
               {filteredLinks.length}
             </span>
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredLinks.map((link, idx) => {
               const palette = LINK_CARD_COLORS[idx % LINK_CARD_COLORS.length];
               return (
                 <div
                   key={link.id}
-                  className={`group relative flex items-center gap-3 p-4 ${palette.bg} border-2 ${palette.border} rounded-2xl hover:shadow-md hover:-translate-y-0.5 transition-all`}
+                  className={`group relative bg-white rounded-2xl border-2 ${palette.border} shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden flex flex-col justify-between`}
                 >
-                  <a
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 min-w-0 flex-1"
-                  >
-                    {link.thumbnailUrl ? (
-                      <img
-                        src={link.thumbnailUrl}
-                        alt={link.title}
-                        referrerPolicy="no-referrer"
-                        className="w-14 h-14 rounded-xl object-cover border-2 border-white shadow-sm shrink-0"
-                      />
-                    ) : (
-                      <div className={`w-14 h-14 rounded-xl ${palette.iconBg} flex items-center justify-center shrink-0 shadow-sm`}>
-                        <ExternalLink className={`w-6 h-6 ${palette.iconText}`} />
+                  <div>
+                    {/* Thumbnail / Icon area - cung kich thuoc voi the video (aspect-video) */}
+                    <a href={link.url} target="_blank" rel="noopener noreferrer">
+                      <div className={`relative aspect-video w-full ${palette.iconBg} overflow-hidden cursor-pointer flex items-center justify-center`}>
+                        {link.thumbnailUrl ? (
+                          <img
+                            src={link.thumbnailUrl}
+                            alt={link.title}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <ExternalLink className={`w-14 h-14 ${palette.iconText} opacity-70`} />
+                        )}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                          <div className="w-12 h-12 rounded-full bg-white/90 text-slate-700 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                            <ExternalLink className="w-5 h-5" />
+                          </div>
+                        </div>
+                        <div className={`absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-full ${palette.badgeBg} ${palette.badgeText} text-[11px] font-bold`}>
+                          Khối {link.grade}
+                        </div>
                       </div>
-                    )}
-                    <div className="min-w-0">
-                      <span className="block text-base font-extrabold text-slate-900 truncate group-hover:text-emerald-700 transition-colors">
+                    </a>
+
+                    {/* Information */}
+                    <div className="p-4 space-y-1">
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block font-extrabold text-slate-900 text-base line-clamp-1 hover:text-emerald-700 transition-colors"
+                      >
                         {link.title}
-                      </span>
-                      <span className={`inline-block mt-1 text-[11px] font-bold ${palette.badgeText} ${palette.badgeBg} px-2 py-0.5 rounded-full`}>
-                        Khối {link.grade}
-                      </span>
+                      </a>
+                      <span className="block text-xs text-slate-400 truncate">{link.url}</span>
                     </div>
-                  </a>
-                  {isAdmin && (
-                    <button
-                      onClick={() => handleDeleteLink(link.id)}
-                      className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-white/80 text-slate-400 hover:text-white hover:bg-rose-500 border border-slate-200 hover:border-rose-500 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-                      title="Xóa liên kết"
+                  </div>
+
+                  {/* Bottom Meta */}
+                  <div className="px-4 py-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`${palette.iconText} hover:underline font-bold flex items-center gap-1.5`}
                     >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                      <span>Mở liên kết</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDeleteLink(link.id)}
+                        className="text-slate-400 hover:text-rose-600 font-bold flex items-center gap-1 cursor-pointer"
+                        title="Xóa liên kết"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Xóa</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
