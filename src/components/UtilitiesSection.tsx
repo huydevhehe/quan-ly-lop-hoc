@@ -98,7 +98,16 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
   const [importError, setImportError] = useState('');
   const [isImporting, setIsImporting] = useState(false);
 
-  const currentClass = classrooms.find((c) => c.id === selectedClassId) || classrooms[0];
+  // Luôn có 1 object hợp lệ để render, tránh crash trắng trang khi classrooms chưa tải
+  // xong (vd vừa tải lại trang trong khi tab này đang mở) — classrooms rỗng thì [0] vẫn undefined.
+  const currentClass = classrooms.find((c) => c.id === selectedClassId) || classrooms[0] || {
+    id: '',
+    name: 'Đang tải...',
+    grade: 1,
+    academicYear: '',
+    totalStudents: 0,
+    roomCode: '',
+  };
   const classStudents = students.filter((s) => s.classId === selectedClassId);
 
   // Timer logic
