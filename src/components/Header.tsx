@@ -62,7 +62,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Right: Quick Room Code Badge on Mobile */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0 overflow-x-auto">
         <div
           onClick={onOpenRoomModal}
           className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 py-1 px-2.5 rounded-lg text-blue-700 cursor-pointer shadow-2xs"
