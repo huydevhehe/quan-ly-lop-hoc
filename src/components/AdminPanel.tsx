@@ -348,7 +348,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               Chỉ định các mục Giáo viên được phép xem và sử dụng khi truy cập
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Khi tài khoản Giáo viên đăng nhập, các mục bạn TẮT ở đây sẽ bị ẩn khỏi thanh menu. Quản trị viên (Thầy Kiên) <strong>luôn có toàn quyền truy cập tất cả các mục</strong>.
+              Khi tài khoản Giáo viên đăng nhập, các mục bạn TẮT ở đây sẽ bị ẩn khỏi thanh menu. Quản trị viên <strong>luôn có toàn quyền truy cập tất cả các mục</strong>.
             </p>
           </div>
 

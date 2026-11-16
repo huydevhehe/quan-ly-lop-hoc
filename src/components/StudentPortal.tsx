@@ -40,7 +40,7 @@ interface StudentPortalProps {
 
 export const StudentPortal: React.FC<StudentPortalProps> = ({
   roomCode,
-  teacherUsername = 'trungkienkd2025',
+  teacherUsername = 'Giáo viên',
   classrooms,
   onOpenTeacherLogin,
   onRecordSubmission,
