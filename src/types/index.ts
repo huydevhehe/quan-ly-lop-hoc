@@ -20,6 +20,7 @@ export interface Classroom {
   totalStudents: number;
   roomCode: string;
   createdBy?: string;
+  createdByName?: string;
 }
 
 export interface QuizQuestion {

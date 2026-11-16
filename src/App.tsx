@@ -380,7 +380,11 @@ export default function App() {
       <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex flex-col antialiased">
         <StudentPortal
           roomCode={currentRoomCode}
-          teacherUsername={currentUser.role === 'admin' || currentUser.role === 'teacher' ? currentUser.username : 'trungkienkd2025'}
+          teacherUsername={
+            currentUser.role === 'admin' || currentUser.role === 'teacher'
+              ? currentUser.username
+              : classrooms.find((c) => c.id === selectedClassId)?.createdByName || 'Giáo viên'
+          }
           classrooms={classrooms}
           onOpenTeacherLogin={() => setIsLoginModalOpen(true)}
         />

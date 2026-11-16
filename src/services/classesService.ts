@@ -45,7 +45,8 @@ export async function listMyClasses(): Promise<Classroom[]> {
       created_by,
       created_at,
       students (count),
-      school_years (name)
+      school_years (name),
+      profiles (full_name)
     `)
     .order('created_at', { ascending: false });
 
@@ -58,6 +59,7 @@ export async function listMyClasses(): Promise<Classroom[]> {
       ? c.students[0].count
       : 0;
     const yearName = Array.isArray(c.school_years) ? c.school_years[0]?.name : c.school_years?.name;
+    const creatorName = Array.isArray(c.profiles) ? c.profiles[0]?.full_name : c.profiles?.full_name;
 
     return {
       id: c.id,
@@ -67,6 +69,7 @@ export async function listMyClasses(): Promise<Classroom[]> {
       totalStudents: studentCount,
       roomCode: c.room_code,
       createdBy: c.created_by || undefined,
+      createdByName: creatorName || undefined,
     };
   });
 }

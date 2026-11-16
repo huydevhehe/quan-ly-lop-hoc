@@ -282,7 +282,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               Khu vực Quản trị tối cao
             </span>
             <span className="text-xs text-slate-400">·</span>
-            <span className="text-xs text-slate-500">Chỉ Thầy Trần Trung Kiên có quyền</span>
+            <span className="text-xs text-slate-500">Chỉ tài khoản Quản trị viên có quyền</span>
           </div>
           <h2 className="text-2xl font-bold text-slate-900 mt-1 flex items-center gap-2">
             <span>Bảng Quản trị & Phân quyền</span>
@@ -710,7 +710,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
             <h3 className="text-xl font-bold text-slate-900">Đổi mật khẩu Quản trị viên</h3>
             <p className="text-xs text-slate-500">
-              Bảo vệ tài khoản Thầy Trần Trung Kiên khi chia sẻ trang web cho học sinh
+              Bảo vệ tài khoản Quản trị viên khi chia sẻ trang web cho học sinh
             </p>
           </div>
 

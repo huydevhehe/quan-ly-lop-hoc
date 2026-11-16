@@ -218,8 +218,8 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
         name: c.name,
         grade: `Khối ${c.grade}`,
         bg: 'bg-emerald-500',
-        createdBy: currentUser?.id,
-        createdByName: currentUser?.fullName || 'Giáo viên',
+        createdBy: c.createdBy,
+        createdByName: c.createdByName,
         totalStudents: c.totalStudents,
       }));
       setClassesData(mapped);
@@ -542,19 +542,9 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   // Admin toggle to view all teachers' classes or only personal classes (mặc định xem tất cả để đồng nhất trên mọi máy tính)
   const [adminViewAll, setAdminViewAll] = useState(true);
 
-  // Chuẩn hóa dữ liệu lớp cũ chưa có createdBy
-  const normalizedClasses = useMemo(() => {
-    return classesData.map((c: ClassItem) => {
-      if (!c.createdBy) {
-        return {
-          ...c,
-          createdBy: 'u_admin',
-          createdByName: 'Thầy Trần Trung Kiên',
-        };
-      }
-      return c;
-    });
-  }, [classesData]);
+  // Lớp cũ chưa gán giáo viên tạo (created_by null) thì để nguyên, không bịa tên
+  // giáo viên giả — tránh hiện sai chủ sở hữu lớp.
+  const normalizedClasses = classesData;
 
   // Lọc chỉ các lớp thuộc về tài khoản người dùng đang đăng nhập
   const visibleClasses = useMemo(() => {
