@@ -41,6 +41,9 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   onSwitchToStudentPortal,
 }) => {
   const [copied, setCopied] = useState(false);
+  // Tài khoản nhân sự thật (admin hoặc giáo viên được gán lớp) — khác với học sinh ẩn danh.
+  // isAdmin chỉ đúng cho admin, nên không thể dùng riêng nó để phân biệt "nhân viên" và "học sinh".
+  const isStaff = currentUser?.role === 'admin' || currentUser?.role === 'teacher';
 
   const handleCopyCode = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -61,7 +64,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     {
       id: 'classroom',
       title: 'Quản lý lớp học',
-      description: isAdmin
+      description: isStaff
         ? 'Quản lý học sinh, điểm danh, phát biểu và điểm thi đua'
         : 'Xem danh sách thi đua, số sao tích lũy và điểm danh của lớp',
       icon: <Users className="w-6 h-6 text-white" />,
@@ -72,7 +75,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     {
       id: 'quiz',
       title: 'Câu hỏi trắc nghiệm',
-      description: isAdmin
+      description: isStaff
         ? 'Quản lý ngân hàng câu hỏi trắc nghiệm Tin học'
         : 'Làm bài thi thử trắc nghiệm ôn tập kiến thức Tin học',
       icon: <GraduationCap className="w-6 h-6 text-white" />,
@@ -132,21 +135,21 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         <div className="space-y-1">
           <span className="text-slate-500 text-sm font-medium">Xin chào,</span>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-            <span>{isAdmin ? teacherName : (currentUser?.fullName || 'Học sinh')}</span>
-            {!isAdmin && (
+            <span>{isStaff ? teacherName : (currentUser?.fullName || 'Học sinh')}</span>
+            {!isStaff && (
               <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full">
                 Học sinh
               </span>
             )}
           </h1>
           <p className="text-slate-500 text-sm">
-            {isAdmin
+            {isStaff
               ? 'Chọn khu vực cần quản lý để bắt đầu công việc trong lớp.'
               : 'Chào mừng em đến với hệ thống học tập. Dưới đây là các khu vực thầy cô cho phép em truy cập.'}
           </p>
         </div>
 
-        {!isAdmin && onOpenLogin && (
+        {!isStaff && onOpenLogin && (
           <button
             onClick={onOpenLogin}
             className="self-start sm:self-auto px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold shadow-2xs transition-colors flex items-center gap-1.5"
