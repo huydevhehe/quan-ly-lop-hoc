@@ -25,13 +25,13 @@ import {
 import * as XLSX from 'xlsx';
 import { QuizQuestion, QuizSubmission } from '../types';
 import { soundManager } from '../utils/audio';
-import { INITIAL_SUBMISSIONS } from '../data/mockData';
 import {
   listTopics,
   listAllQuestions,
   createQuestion,
   deleteQuestion,
   listExamResults,
+  deleteExamResult,
   createTopic,
   generateSampleExcelTemplate,
   parseQuestionsExcelFile,
@@ -70,56 +70,21 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
   const [selectedGrade, setSelectedGrade] = useState<number | 'all'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // Submissions State (Scores of students)
-  const [submissions, setSubmissions] = useState<QuizSubmission[]>(() => {
-    try {
-      const saved = localStorage.getItem('qllh_quiz_submissions');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {
-      console.warn('Error reading quiz submissions:', e);
-    }
-    return INITIAL_SUBMISSIONS;
-  });
+  // Submissions State (Scores of students) — luôn lấy thật từ Supabase, không mock/localStorage
+  const [submissions, setSubmissions] = useState<QuizSubmission[]>([]);
 
-  // Save submissions locally whenever updated
-  useEffect(() => {
-    localStorage.setItem('qllh_quiz_submissions', JSON.stringify(submissions));
-  }, [submissions]);
-
-  // Lắng nghe dữ liệu bài nộp từ đám mây khi có học sinh làm bài hoặc máy khác cập nhật
-  useEffect(() => {
-    const handleGlobalDataSync = (e: any) => {
-      const d = e?.detail?.data;
-      if (d?.submissions && Array.isArray(d.submissions)) {
-        setSubmissions((prev) => (JSON.stringify(prev) === JSON.stringify(d.submissions) ? prev : d.submissions));
-      } else {
-        try {
-          const raw = localStorage.getItem('qllh_quiz_submissions');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-              setSubmissions((prev) => (JSON.stringify(prev) === JSON.stringify(parsed) ? prev : parsed));
-            }
-          }
-        } catch {}
-      }
-    };
-    window.addEventListener('qllh_data_updated', handleGlobalDataSync);
-    return () => window.removeEventListener('qllh_data_updated', handleGlobalDataSync);
-  }, []);
-
-  // Tải kết quả thi học sinh từ Supabase quiz_results join quiz_sessions
-  useEffect(() => {
+  const refreshSubmissions = () => {
     listExamResults()
-      .then((results) => {
-        if (results && results.length > 0) {
-          setSubmissions(results);
-        }
-      })
+      .then((results) => setSubmissions(results))
       .catch(() => {});
+  };
+
+  // Tải kết quả thi học sinh từ Supabase quiz_results join quiz_sessions, và tải lại
+  // mỗi khi có học sinh nộp bài/dữ liệu cập nhật từ máy khác
+  useEffect(() => {
+    refreshSubmissions();
+    window.addEventListener('qllh_data_updated', refreshSubmissions);
+    return () => window.removeEventListener('qllh_data_updated', refreshSubmissions);
   }, []);
 
   // Scores filter state
@@ -230,12 +195,15 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
   };
 
   // Delete a student's submission record
-  const handleDeleteSubmission = (subId: string) => {
-    if (confirm('Thầy có chắc chắn muốn xóa kết quả bài thi này của học sinh?')) {
-      const updated = submissions.filter((s) => s.id !== subId);
-      setSubmissions(updated);
-      localStorage.setItem('qllh_quiz_submissions', JSON.stringify(updated));
+  const handleDeleteSubmission = async (sub: QuizSubmission) => {
+    if (!confirm('Thầy có chắc chắn muốn xóa kết quả bài thi này của học sinh?')) return;
+    if (!sub.sessionId) return;
+    try {
+      await deleteExamResult(sub.sessionId);
+      setSubmissions((prev) => prev.filter((s) => s.id !== sub.id));
       soundManager.playTick();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi xóa kết quả thi');
     }
   };
 
@@ -786,7 +754,7 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                                 </button>
                               )}
                               <button
-                                onClick={() => handleDeleteSubmission(sub.id)}
+                                onClick={() => handleDeleteSubmission(sub)}
                                 className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"
                                 title="Xóa kết quả này"
                               >

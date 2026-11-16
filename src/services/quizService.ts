@@ -361,6 +361,7 @@ export async function listExamResults(classId?: string): Promise<QuizSubmission[
 
     return {
       id: r.id,
+      sessionId: session.id,
       studentName: session.student_name || 'Học sinh',
       className: cls.name || 'Tự do',
       grade: cls.grade || 1,
@@ -371,4 +372,15 @@ export async function listExamResults(classId?: string): Promise<QuizSubmission[
       durationSeconds: r.duration_seconds || 0,
     };
   });
+}
+
+/**
+ * Xóa kết quả bài thi của học sinh (xóa luôn quiz_sessions, quiz_results tự xóa theo vì
+ * có khóa ngoại ON DELETE CASCADE)
+ */
+export async function deleteExamResult(sessionId: string): Promise<void> {
+  const { error } = await supabase.from('quiz_sessions').delete().eq('id', sessionId);
+  if (error) {
+    throw new Error(`Lỗi khi xóa kết quả thi: ${error.message}`);
+  }
 }

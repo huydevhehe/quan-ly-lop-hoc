@@ -79,6 +79,7 @@ export interface StudentPermissions {
 
 export interface QuizSubmission {
   id: string;
+  sessionId?: string;
   studentName: string;
   className: string;
   grade: number;
