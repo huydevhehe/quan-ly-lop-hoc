@@ -22,6 +22,16 @@ interface DigitalResourcesProps {
 const PLACEHOLDER_THUMBNAIL =
   'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=80';
 
+// Bảng màu xoay vòng cho thẻ "Liên kết trang web đã lưu" - to, rõ, nhiều màu cho dễ phân biệt
+const LINK_CARD_COLORS = [
+  { bg: 'bg-emerald-50/70', border: 'border-emerald-200', iconBg: 'bg-emerald-100', iconText: 'text-emerald-600', badgeBg: 'bg-emerald-100', badgeText: 'text-emerald-700' },
+  { bg: 'bg-blue-50/70', border: 'border-blue-200', iconBg: 'bg-blue-100', iconText: 'text-blue-600', badgeBg: 'bg-blue-100', badgeText: 'text-blue-700' },
+  { bg: 'bg-amber-50/70', border: 'border-amber-200', iconBg: 'bg-amber-100', iconText: 'text-amber-600', badgeBg: 'bg-amber-100', badgeText: 'text-amber-700' },
+  { bg: 'bg-fuchsia-50/70', border: 'border-fuchsia-200', iconBg: 'bg-fuchsia-100', iconText: 'text-fuchsia-600', badgeBg: 'bg-fuchsia-100', badgeText: 'text-fuchsia-700' },
+  { bg: 'bg-sky-50/70', border: 'border-sky-200', iconBg: 'bg-sky-100', iconText: 'text-sky-600', badgeBg: 'bg-sky-100', badgeText: 'text-sky-700' },
+  { bg: 'bg-rose-50/70', border: 'border-rose-200', iconBg: 'bg-rose-100', iconText: 'text-rose-600', badgeBg: 'bg-rose-100', badgeText: 'text-rose-700' },
+];
+
 export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = true }) => {
   const [resources, setResources] = useState<DigitalResource[]>([]);
   const [links, setLinks] = useState<Resource[]>([]);
@@ -173,49 +183,63 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
 
       {/* Saved Website Links (separate from video lessons) */}
       {filteredLinks.length > 0 && (
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-2.5">
-          <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
-            <Share2 className="w-3.5 h-3.5 text-emerald-600" />
-            Liên kết trang web đã lưu ({filteredLinks.length})
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide flex items-center gap-2">
+            <span className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+              <Share2 className="w-4 h-4 text-emerald-600" />
+            </span>
+            Liên kết trang web đã lưu
+            <span className="text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+              {filteredLinks.length}
+            </span>
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {filteredLinks.map((link) => (
-              <div
-                key={link.id}
-                className="flex items-center justify-between gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl"
-              >
-                <a
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 min-w-0 flex-1 hover:text-emerald-700"
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {filteredLinks.map((link, idx) => {
+              const palette = LINK_CARD_COLORS[idx % LINK_CARD_COLORS.length];
+              return (
+                <div
+                  key={link.id}
+                  className={`group relative flex items-center gap-3 p-4 ${palette.bg} border-2 ${palette.border} rounded-2xl hover:shadow-md hover:-translate-y-0.5 transition-all`}
                 >
-                  {link.thumbnailUrl ? (
-                    <img
-                      src={link.thumbnailUrl}
-                      alt={link.title}
-                      referrerPolicy="no-referrer"
-                      className="w-9 h-9 rounded-lg object-cover border border-slate-200 shrink-0"
-                    />
-                  ) : (
-                    <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
-                      <ExternalLink className="w-3.5 h-3.5 text-emerald-600" />
-                    </div>
-                  )}
-                  <span className="text-xs font-semibold text-slate-800 truncate">{link.title}</span>
-                  <span className="text-[10px] text-slate-400 shrink-0">Khối {link.grade}</span>
-                </a>
-                {isAdmin && (
-                  <button
-                    onClick={() => handleDeleteLink(link.id)}
-                    className="text-slate-400 hover:text-red-500 transition-colors p-1 shrink-0"
-                    title="Xóa liên kết"
+                  <a
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 min-w-0 flex-1"
                   >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            ))}
+                    {link.thumbnailUrl ? (
+                      <img
+                        src={link.thumbnailUrl}
+                        alt={link.title}
+                        referrerPolicy="no-referrer"
+                        className="w-14 h-14 rounded-xl object-cover border-2 border-white shadow-sm shrink-0"
+                      />
+                    ) : (
+                      <div className={`w-14 h-14 rounded-xl ${palette.iconBg} flex items-center justify-center shrink-0 shadow-sm`}>
+                        <ExternalLink className={`w-6 h-6 ${palette.iconText}`} />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <span className="block text-base font-extrabold text-slate-900 truncate group-hover:text-emerald-700 transition-colors">
+                        {link.title}
+                      </span>
+                      <span className={`inline-block mt-1 text-[11px] font-bold ${palette.badgeText} ${palette.badgeBg} px-2 py-0.5 rounded-full`}>
+                        Khối {link.grade}
+                      </span>
+                    </div>
+                  </a>
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleDeleteLink(link.id)}
+                      className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-white/80 text-slate-400 hover:text-white hover:bg-rose-500 border border-slate-200 hover:border-rose-500 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
+                      title="Xóa liên kết"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
