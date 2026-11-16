@@ -149,14 +149,7 @@ export function generateSampleExcelTemplate(): Blob {
 export async function listTopics(): Promise<QuizTopicItem[]> {
   const { data, error } = await supabase
     .from('quiz_topics')
-    .select(`
-      id,
-      grade,
-      name,
-      is_active,
-      is_forced,
-      quiz_questions (count)
-    `)
+    .select('id, grade, name, is_active, is_forced')
     .order('grade', { ascending: true })
     .order('name', { ascending: true });
 
@@ -164,21 +157,29 @@ export async function listTopics(): Promise<QuizTopicItem[]> {
     throw new Error(`Lỗi khi lấy danh sách chủ đề: ${error.message}`);
   }
 
-  return (data || []).map((t: any) => {
-    const qCount =
-      Array.isArray(t.quiz_questions) && t.quiz_questions[0]?.count != null
-        ? t.quiz_questions[0].count
-        : 0;
+  const topics = data || [];
 
-    return {
-      id: t.id,
-      grade: t.grade || 1,
-      name: t.name,
-      isActive: t.is_active ?? false,
-      isForced: t.is_forced ?? false,
-      questionCount: qCount,
-    };
-  });
+  // Đếm số câu hỏi qua RPC riêng (không phải embed quiz_questions(count)) vì học sinh ẩn
+  // danh không còn quyền SELECT trực tiếp bảng quiz_questions (để không lộ đáp án đúng) —
+  // embed sẽ luôn trả về 0 cho phiên của họ do bị RLS lọc.
+  const counts = new Map<string, number>();
+  if (topics.length > 0) {
+    const { data: countRows } = await supabase.rpc('count_questions_by_topic', {
+      topic_ids: topics.map((t) => t.id),
+    });
+    (countRows || []).forEach((row: any) => {
+      counts.set(row.topic_id, Number(row.question_count) || 0);
+    });
+  }
+
+  return topics.map((t: any) => ({
+    id: t.id,
+    grade: t.grade || 1,
+    name: t.name,
+    isActive: t.is_active ?? false,
+    isForced: t.is_forced ?? false,
+    questionCount: counts.get(t.id) || 0,
+  }));
 }
 
 /**

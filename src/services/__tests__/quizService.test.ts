@@ -4,6 +4,7 @@ vi.mock('../../lib/supabaseClient', () => {
   return {
     supabase: {
       from: vi.fn(),
+      rpc: vi.fn(),
     },
   };
 });
@@ -32,7 +33,6 @@ describe('quizService', () => {
         grade: 5,
         name: 'Tin học 5',
         is_active: true,
-        quiz_questions: [{ count: 3 }],
       },
     ];
 
@@ -40,11 +40,16 @@ describe('quizService', () => {
     const orderGradeMock = vi.fn().mockReturnValue({ order: orderNameMock });
     const selectMock = vi.fn().mockReturnValue({ order: orderGradeMock });
     (supabase.from as any).mockReturnValue({ select: selectMock });
+    (supabase.rpc as any).mockResolvedValue({
+      data: [{ topic_id: 't1', question_count: 3 }],
+      error: null,
+    });
 
     const topics = await listTopics();
     expect(topics.length).toBe(1);
     expect(topics[0].id).toBe('t1');
     expect(topics[0].questionCount).toBe(3);
+    expect(supabase.rpc).toHaveBeenCalledWith('count_questions_by_topic', { topic_ids: ['t1'] });
   });
 
   it('createTopic them chu de moi va tra ve id', async () => {
