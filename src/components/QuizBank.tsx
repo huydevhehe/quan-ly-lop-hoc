@@ -45,6 +45,18 @@ interface QuizBankProps {
   isAdmin?: boolean;
 }
 
+function formatSubmittedAt(value: string): string {
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return value;
+  return date.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
   // Ngân hàng câu hỏi thật (từ Supabase quiz_questions/quiz_topics), không còn dùng localStorage
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>([]);
@@ -340,7 +352,7 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
         'Số câu đúng': `${sub.correctAnswers}/${sub.totalQuestions}`,
         'Xếp loại': classification,
         'Thời gian làm bài': durationStr,
-        'Thời gian nộp': sub.submittedAt
+        'Thời gian nộp': formatSubmittedAt(sub.submittedAt)
       };
     });
 
@@ -740,7 +752,7 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                             {Math.floor(sub.durationSeconds / 60)}p {sub.durationSeconds % 60}s
                           </td>
                           <td className="py-3 px-4 text-slate-400 text-[11px] whitespace-nowrap">
-                            {sub.submittedAt}
+                            {formatSubmittedAt(sub.submittedAt)}
                           </td>
                           <td className="py-3 px-3 text-center">
                             <div className="flex items-center justify-center gap-1.5">

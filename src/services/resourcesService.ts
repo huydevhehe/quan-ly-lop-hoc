@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 import { Resource } from '../types';
+import { translateSupabaseError } from '../utils/errorMessages';
 
 /**
  * Lấy danh sách tài nguyên theo loại ('video' | 'link' | 'game') và khối lớp tuỳ chọn
@@ -19,7 +20,7 @@ export async function listResources(
 
   const { data, error } = await query;
   if (error) {
-    throw new Error(`Lỗi khi lấy danh sách tài nguyên: ${error.message}`);
+    throw new Error(translateSupabaseError(error, 'Không thể tải danh sách tài nguyên. Vui lòng thử lại.'));
   }
 
   return (data || []).map((r: any) => ({
@@ -56,7 +57,7 @@ export async function createResource(input: Omit<Resource, 'id'>): Promise<strin
     .single();
 
   if (error || !data) {
-    throw new Error(`Không thể tạo tài nguyên: ${error?.message}`);
+    throw new Error(translateSupabaseError(error, 'Không thể lưu liên kết. Vui lòng kiểm tra lại thông tin và thử lại.'));
   }
 
   return data.id;
@@ -72,7 +73,7 @@ export async function setResourceActive(id: string, isActive: boolean): Promise<
     .eq('id', id);
 
   if (error) {
-    throw new Error(`Không thể cập nhật trạng thái tài nguyên: ${error.message}`);
+    throw new Error(translateSupabaseError(error, 'Không thể cập nhật trạng thái tài nguyên. Vui lòng thử lại.'));
   }
 }
 
@@ -83,6 +84,6 @@ export async function deleteResource(id: string): Promise<void> {
   const { error } = await supabase.from('resources').delete().eq('id', id);
 
   if (error) {
-    throw new Error(`Không thể xóa tài nguyên: ${error.message}`);
+    throw new Error(translateSupabaseError(error, 'Không thể xóa tài nguyên. Vui lòng thử lại.'));
   }
 }

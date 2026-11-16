@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
+import { translateSupabaseError } from '../utils/errorMessages';
 
 export async function uploadQuestionImage(
   file: File
@@ -25,7 +26,7 @@ export async function uploadQuestionImage(
       });
 
     if (uploadError) {
-      return { error: `Lỗi tải ảnh lên: ${uploadError.message}` };
+      return { error: translateSupabaseError(uploadError, 'Không thể tải ảnh lên. Vui lòng thử lại.') };
     }
 
     const { data } = supabase.storage.from('quiz-images').getPublicUrl(fileName);
