@@ -23,9 +23,11 @@ import {
   Shuffle,
   Sparkles,
   ShieldAlert,
+  ClipboardList,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Student, UserAccount } from '../types';
+import { StudentCommentsManager } from './StudentCommentsManager';
 import { listMyClasses, createClass, updateClass, deleteClass } from '../services/classesService';
 import { listStudentsByClass, upsertStudents, deleteStudent } from '../services/studentsService';
 import { listSchoolYears, createSchoolYear, SchoolYearItem } from '../services/schoolYearsService';
@@ -470,6 +472,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
 
   // Import Excel modal state & ref
   const [showImportExcelModal, setShowImportExcelModal] = useState(false);
+  const [showCommentsExportModal, setShowCommentsExportModal] = useState(false);
   const excelFileInputRef = useRef<HTMLInputElement>(null);
 
   // Random picker modal state
@@ -2426,6 +2429,15 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
 
                   <button
                     type="button"
+                    onClick={() => setShowCommentsExportModal(true)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 text-xs shadow-2xs whitespace-nowrap cursor-pointer active:scale-95"
+                  >
+                    <ClipboardList className="w-3.5 h-3.5" />
+                    <span>Xuất đánh giá</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setShowImportExcelModal(true)}
                     className="bg-[#0070f3] hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 text-xs shadow-2xs whitespace-nowrap cursor-pointer active:scale-95"
                   >
@@ -2980,6 +2992,18 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             <p className="mt-4 text-xs md:text-sm text-slate-900 font-semibold leading-relaxed">
               Cột bắt buộc: Mã học sinh, Họ và tên. Tối đa 200 học sinh, file tối đa 2 MB (.xlsx hoặc .xls). Bạn có thể dùng file đã xuất từ lớp này để thêm học sinh mới.
             </p>
+          </div>
+        </div>
+      )}
+
+      {showCommentsExportModal && (
+        <div className="fixed inset-0 bg-black/50 z-[120] flex justify-center items-center px-4 backdrop-blur-xs overflow-y-auto py-6">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl p-4 md:p-6 relative animate-fadeIn max-h-[90vh] overflow-y-auto">
+            <StudentCommentsManager
+              isModal
+              onCloseModal={() => setShowCommentsExportModal(false)}
+              currentUser={currentUser}
+            />
           </div>
         </div>
       )}
