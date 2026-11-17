@@ -532,7 +532,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
         return w;
       }
     }
-    return weekByClass[clsId] || 9;
+    return 9;
   };
 
   // Calculate Auto Dates (from reference code)
