@@ -99,17 +99,33 @@ export const GamesSection: React.FC = () => {
   }, [mysteryRewards]);
   const [showMysteryManageModal, setShowMysteryManageModal] = useState(false);
 
-  // Brain Break state
+  // Brain Break state - danh sach dong tac co the them/sua/xoa, luu localStorage
   const [breakSeconds, setBreakSeconds] = useState(120);
   const [isBreakRunning, setIsBreakRunning] = useState(false);
   const [exerciseIndex, setExerciseIndex] = useState(0);
 
-  const exercises = [
+  const DEFAULT_EXERCISES = [
     { title: 'Vươn vai hít thở sâu', desc: 'Hai tay đưa lên cao, hít vào thật sâu rồi từ từ thở ra 5 lần', icon: '🧘' },
     { title: 'Xoay cổ tay và khớp vai', desc: 'Xoay tròn cổ tay 10 vòng để thư giãn sau khi gõ bàn phím', icon: '🤸' },
     { title: 'Vỗ tay theo nhịp điệu vui nhộn', desc: 'Vỗ tay 1 - 2 - 3, cười thật tươi cùng các bạn trong bàn!', icon: '👏' },
     { title: 'Chớp mắt và nhìn xa 20 giây', desc: 'Nhìn ra ngoài cửa sổ để thư giãn mắt sau bài học trên màn hình', icon: '👀' },
   ];
+  const [exercises, setExercises] = useState<{ title: string; desc: string; icon: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('qllh_brain_break_exercises');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= 1) return parsed;
+      }
+    } catch {}
+    return DEFAULT_EXERCISES;
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('qllh_brain_break_exercises', JSON.stringify(exercises));
+    } catch {}
+  }, [exercises]);
+  const [showExerciseManageModal, setShowExerciseManageModal] = useState(false);
 
   // Draw wheel on canvas
   useEffect(() => {
@@ -313,6 +329,22 @@ export const GamesSection: React.FC = () => {
     }
     setMysteryRewards((prev) => prev.filter((_, i) => i !== idx));
     setOpenedBoxes((prev) => prev.filter((i) => i !== idx).map((i) => (i > idx ? i - 1 : i)));
+  };
+
+  // CRUD cho danh sach dong tac van dong giai lao
+  const handleAddExercise = () => {
+    setExercises((prev) => [...prev, { title: 'Động tác mới', desc: 'Nhập mô tả động tác...', icon: '🙆' }]);
+  };
+  const handleUpdateExercise = (idx: number, patch: Partial<{ title: string; desc: string; icon: string }>) => {
+    setExercises((prev) => prev.map((ex, i) => (i === idx ? { ...ex, ...patch } : ex)));
+  };
+  const handleDeleteExercise = (idx: number) => {
+    if (exercises.length <= 1) {
+      alert('Cần tối thiểu 1 động tác.');
+      return;
+    }
+    setExercises((prev) => prev.filter((_, i) => i !== idx));
+    setExerciseIndex((prev) => (prev >= exercises.length - 1 ? 0 : prev));
   };
 
   // Brain break timer
@@ -548,17 +580,22 @@ export const GamesSection: React.FC = () => {
           </div>
 
           {/* Active Exercise Guidance */}
-          <div className="max-w-md w-full p-5 bg-emerald-50/70 border border-emerald-200 rounded-2xl text-left flex items-start gap-3">
-            <span className="text-3xl select-none">{exercises[exerciseIndex].icon}</span>
-            <div>
-              <h4 className="font-bold text-emerald-900 text-sm">
-                Động tác: {exercises[exerciseIndex].title}
-              </h4>
-              <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                {exercises[exerciseIndex].desc}
-              </p>
-            </div>
-          </div>
+          {(() => {
+            const current = exercises[exerciseIndex] || exercises[0];
+            return (
+              <div className="max-w-md w-full p-5 bg-emerald-50/70 border border-emerald-200 rounded-2xl text-left flex items-start gap-3">
+                <span className="text-3xl select-none">{current.icon}</span>
+                <div>
+                  <h4 className="font-bold text-emerald-900 text-sm">
+                    Động tác: {current.title}
+                  </h4>
+                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                    {current.desc}
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Action buttons */}
           <div className="mt-6 flex items-center gap-3">
@@ -578,6 +615,14 @@ export const GamesSection: React.FC = () => {
               className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
             >
               Đặt lại 2 phút
+            </button>
+
+            <button
+              onClick={() => setShowExerciseManageModal(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>Quản lý động tác ({exercises.length})</span>
             </button>
           </div>
         </div>
@@ -842,6 +887,77 @@ export const GamesSection: React.FC = () => {
               </button>
               <button
                 onClick={() => setShowMysteryManageModal(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Xong
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Quan ly danh sach dong tac van dong giai lao (them/sua/xoa) */}
+      {showExerciseManageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl shadow-xl border border-slate-200 w-full max-w-lg p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 text-base">Quản lý động tác vận động giải lao</h3>
+              <button
+                onClick={() => setShowExerciseManageModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {exercises.map((ex, idx) => (
+                <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <input
+                      type="text"
+                      value={ex.icon}
+                      onChange={(e) => handleUpdateExercise(idx, { icon: e.target.value })}
+                      className="w-12 px-2 py-1.5 text-base text-center border border-slate-200 rounded-lg shrink-0"
+                      title="Biểu tượng (emoji)"
+                      maxLength={4}
+                    />
+                    <input
+                      type="text"
+                      value={ex.title}
+                      onChange={(e) => handleUpdateExercise(idx, { title: e.target.value })}
+                      className="flex-1 px-3 py-1.5 text-xs font-bold border border-slate-200 rounded-lg"
+                      placeholder="Tên động tác"
+                    />
+                    <button
+                      onClick={() => handleDeleteExercise(idx)}
+                      className="p-1 text-slate-400 hover:text-rose-600 transition-colors shrink-0 cursor-pointer"
+                      title="Xóa động tác này"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={ex.desc}
+                    onChange={(e) => handleUpdateExercise(idx, { desc: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg"
+                    placeholder="Mô tả động tác"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <button
+                onClick={handleAddExercise}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thêm động tác</span>
+              </button>
+              <button
+                onClick={() => setShowExerciseManageModal(false)}
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
               >
                 Xong
