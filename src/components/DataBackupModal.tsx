@@ -231,6 +231,8 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({ isOpen, onClos
   const [cloudStatus, setCloudStatus] = useState<string>('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -263,9 +265,6 @@ export const DataBackupModal: React.FC<DataBackupModalProps> = ({ isOpen, onClos
   }, [isOpen]);
 
   if (!isOpen) return null;
-
-  const [isExporting, setIsExporting] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
 
   const handleExportBackup = async () => {
     setIsExporting(true);

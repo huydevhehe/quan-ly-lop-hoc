@@ -294,7 +294,22 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   const [currentView, setCurrentView] = useState<'list' | 'detail'>('list');
   const [currentClassId, setCurrentClassId] = useState<string>(() => selectedClassIdExternal || '');
   const [subTab, setSubTab] = useState<'week' | 'student' | 'grade'>('week');
-  const [currentWeek, setCurrentWeek] = useState<number>(9);
+  // Tuan dang xem - truoc day luon reset ve 9 khi thoat man "Quan ly lop hoc" roi vao lai (component
+  // unmount/remount), khien giao vien tuong nham la mat du lieu diem danh/danh gia cua tuan dang lam.
+  // Du lieu tung tuan van luu dung trong Supabase theo so tuan - chi so "dang xem tuan nao" la chua
+  // duoc nho, nen gio luu vao localStorage de giu nguyen tuan dang chon.
+  const [currentWeek, setCurrentWeek] = useState<number>(() => {
+    try {
+      const saved = parseInt(localStorage.getItem('qllh_current_week') || '', 10);
+      if (!isNaN(saved) && saved >= 1 && saved <= 35) return saved;
+    } catch {}
+    return 9;
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('qllh_current_week', String(currentWeek));
+    } catch {}
+  }, [currentWeek]);
   const [currentTerm, setCurrentTerm] = useState<'hk1' | 'hk2'>('hk1');
 
   useEffect(() => {
