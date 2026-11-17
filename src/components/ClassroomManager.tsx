@@ -36,6 +36,7 @@ import {
   saveWeekEvaluation,
 } from '../services/attendanceService';
 import { getClassScores, saveScore } from '../services/scoresService';
+import { getClassWeekDates, saveClassWeekDates } from '../services/weekDatesService';
 import { getMyTimetable, saveMyTimetable } from '../services/timetableService';
 import { RandomPickerModal } from './RandomPickerModal';
 
@@ -332,6 +333,34 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     }
   }, [currentClassId]);
 
+  // Tai ngay bat dau/ket thuc cac tuan hoc that tu Supabase (truoc day chi luu tam trong
+  // state React, bam Luu xong F5 la mat - xem services/weekDatesService.ts)
+  useEffect(() => {
+    if (!currentClassId) return;
+    getClassWeekDates(currentClassId)
+      .then((loaded) => {
+        setWeeksData((prev) => ({ ...prev, ...loaded }));
+      })
+      .catch(() => {});
+  }, [currentClassId]);
+
+  // Tai ngay cac tuan cua TAT CA cac lop (khong chi lop dang mo) de man danh sach lop co the
+  // tinh "tuan thuc te" (theo ngay hom nay) cho tung lop, thay vi hien theo tuan dang xem tam.
+  const loadedWeekDatesClassIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const idsToLoad = classesData
+      .map((c) => c.id)
+      .filter((id) => id && !loadedWeekDatesClassIdsRef.current.has(id));
+    if (idsToLoad.length === 0) return;
+    idsToLoad.forEach((id) => loadedWeekDatesClassIdsRef.current.add(id));
+    Promise.all(idsToLoad.map((id) => getClassWeekDates(id).catch(() => ({}))))
+      .then((results) => {
+        const merged: Record<string, WeekDateRecord> = {};
+        results.forEach((r) => Object.assign(merged, r));
+        setWeeksData((prev) => ({ ...prev, ...merged }));
+      });
+  }, [classesData]);
+
   useEffect(() => {
     if (currentClassId) {
       const termParam = currentTerm === 'hk1' ? 'hk1' : 'ca_nam';
@@ -490,6 +519,21 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       handleDeleteCurrentYear(actionTrigger.year || currentYear);
     }
   }, [actionTrigger]);
+
+  // Tuan THUC TE cua 1 lop (de hien o the lop ngoai danh sach) - tinh theo ngay hom nay nam
+  // trong khoang Tu ngay/Den ngay cua tuan nao, KHONG phai tuan dang bam xem/sua trong man
+  // chi tiet lop (truoc day nham lan 2 cai nay lam 1, nen chi bam xem tuan khac de kiem tra
+  // la the lop ngoai danh sach cung bi nhay theo, dung ra no phai dung yen theo ngay thuc).
+  const getRealWeekForClass = (clsId: string): number => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    for (let w = 1; w <= 35; w++) {
+      const rec = weeksData[`${clsId}_${w}`];
+      if (rec && rec.start && rec.end && todayStr >= rec.start && todayStr <= rec.end) {
+        return w;
+      }
+    }
+    return weekByClass[clsId] || 9;
+  };
 
   // Calculate Auto Dates (from reference code)
   const calculateAutoDates = (targetWeekNum: number, clsId: string) => {
@@ -754,7 +798,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     }
   };
 
-  // Action: Save Week Dates
+  // Action: Save Week Dates - luu that len Supabase (truoc day chi doi state React, F5 mat)
   const handleSaveWeekDates = () => {
     if (!currentClassId) return;
     const key = `${currentClassId}_${currentWeek}`;
@@ -763,8 +807,12 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       [key]: { start: weekStartDate, end: weekEndDate },
     }));
     setIsAutoDateHint(false);
-    setSaveWeekDateSuccess(true);
-    setTimeout(() => setSaveWeekDateSuccess(false), 1500);
+    saveClassWeekDates(currentClassId, currentWeek, weekStartDate, weekEndDate)
+      .then(() => {
+        setSaveWeekDateSuccess(true);
+        setTimeout(() => setSaveWeekDateSuccess(false), 1500);
+      })
+      .catch((err) => alert(`Không thể lưu ngày tuần học: ${err.message}`));
   };
 
   // Action: Save Student Evaluation
@@ -1931,7 +1979,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                       <Users className={`w-3.5 h-3.5 ${gradeColor.iconText}`} />
                       <span>{hsCount} học sinh</span>
                       <span className="text-slate-300">·</span>
-                      <span>Tuần {weekByClass[cls.id] || 9}/35</span>
+                      <span>Tuần {getRealWeekForClass(cls.id)}/35</span>
                     </div>
 
                     <div className="flex items-center justify-end mt-3">
