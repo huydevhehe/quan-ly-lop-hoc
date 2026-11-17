@@ -121,8 +121,11 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
   // null = dang them cau hoi moi; co id = dang sua cau hoi da co (khong doi duoc khoi/chu de)
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
 
-  // Mỗi khi đổi khối lớp trong form thêm câu hỏi, reset lựa chọn chủ đề (vì chủ đề phụ thuộc khối)
+  // Mỗi khi đổi khối lớp trong form thêm câu hỏi, reset lựa chọn chủ đề (vì chủ đề phụ thuộc khối).
+  // Bỏ qua khi đang MỞ form sửa 1 câu hỏi có sẵn (openEditQuestion đổi newGrade + newTopicChoice
+  // cùng lúc để nạp sẵn dữ liệu) - nếu không sẽ bị effect này xoá mất chủ đề vừa nạp.
   useEffect(() => {
+    if (editingQuestionId) return;
     setNewTopicChoice('');
     setNewTopicName('');
   }, [newGrade]);
