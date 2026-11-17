@@ -766,24 +766,40 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
     });
   };
 
+  // Giao diện dạng "các bước" (stepper): mỗi mục có số thứ tự + màu riêng để dễ theo dõi
+  // đang ở bước nào, thay vì chỉ là chữ + mũi tên như trước.
+  const STEP_META: Record<string, { num: number; chipBg: string; chipText: string; ring: string; barBg: string }> = {
+    config: { num: 1, chipBg: 'bg-blue-600', chipText: 'text-white', ring: 'ring-blue-100', barBg: 'bg-blue-50/70' },
+    uploadMenu: { num: 2, chipBg: 'bg-purple-600', chipText: 'text-white', ring: 'ring-purple-100', barBg: 'bg-purple-50/70' },
+    export: { num: 3, chipBg: 'bg-emerald-600', chipText: 'text-white', ring: 'ring-emerald-100', barBg: 'bg-emerald-50/70' },
+  };
+
   const AccordionHeader: React.FC<{
     sectionKey: string;
     title: string;
     subtitle?: string;
   }> = ({ sectionKey, title, subtitle }) => {
     const isOpen = expandedSections.has(sectionKey);
+    const meta = STEP_META[sectionKey];
     return (
       <button
         type="button"
         onClick={() => toggleSection(sectionKey)}
-        className="w-full flex items-center justify-between gap-3 text-left cursor-pointer"
+        className="w-full flex items-center gap-3.5 text-left cursor-pointer px-4 py-3.5 sm:px-5 sm:py-4 rounded-2xl hover:bg-white/60 transition-colors"
       >
-        <div>
-          <h4 className="text-xs sm:text-sm font-bold text-slate-800">{title}</h4>
-          {subtitle && <p className="text-[11px] text-slate-500 font-medium mt-0.5">{subtitle}</p>}
+        {meta && (
+          <span
+            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full ${meta.chipBg} ${meta.chipText} flex items-center justify-center font-black text-sm shrink-0 ring-4 ${meta.ring}`}
+          >
+            {meta.num}
+          </span>
+        )}
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm sm:text-[15px] font-extrabold text-slate-900">{title}</h4>
+          {subtitle && <p className="text-[11px] sm:text-xs text-slate-500 font-medium mt-0.5">{subtitle}</p>}
         </div>
         <ChevronDown
-          className={`w-4 h-4 text-slate-500 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-5 h-5 text-slate-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-slate-700' : ''}`}
         />
       </button>
     );
@@ -825,27 +841,27 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
       />
 
       {/* Main Container Card */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-6">
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-2xs space-y-5">
         {/* Header Row */}
-        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-slate-100 pb-5">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
-                <Award className="w-5 h-5" />
-              </span>
-              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                Chức năng nhận xét học sinh tự động (Excel)
+        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 pb-5 border-b border-slate-100">
+          <div className="flex items-start gap-3.5">
+            <span className="p-2.5 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-md shrink-0">
+              <Award className="w-5 h-5 sm:w-6 sm:h-6" />
+            </span>
+            <div>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
+                Nhận xét học sinh tự động
               </h3>
+              <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1 max-w-xl">
+                Tự động phân bổ câu nhận xét theo xếp loại T / H từ thẻ điểm, xuất file Excel mỗi lớp là 1 sheet chuẩn.
+              </p>
             </div>
-            <p className="text-xs sm:text-sm text-slate-600 font-medium">
-              Tự động phân bổ câu nhận xét theo xếp loại T / H từ thẻ điểm, xuất file Excel mỗi lớp là 1 sheet chuẩn theo ảnh mẫu.
-            </p>
           </div>
 
           {isModal && onCloseModal && (
             <button
               onClick={onCloseModal}
-              className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl"
+              className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl shrink-0 self-start cursor-pointer"
             >
               Đóng
             </button>
@@ -853,14 +869,16 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
         </div>
 
         {/* Configuration Row: Khối lớp, Kỳ đánh giá & Thứ tự sắp xếp học sinh (Đồng bộ Thẻ Điểm) */}
-        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-4">
-          <AccordionHeader
-            sectionKey="config"
-            title="Cấu hình xuất nhận xét"
-            subtitle="1. Khối lớp · 2. Kỳ đánh giá · 3. Thứ tự học sinh"
-          />
+        <div className="rounded-2xl border border-blue-200/80 overflow-hidden shadow-2xs">
+          <div className="bg-blue-50/70">
+            <AccordionHeader
+              sectionKey="config"
+              title="Cấu hình xuất nhận xét"
+              subtitle="Khối lớp · Kỳ đánh giá · Thứ tự học sinh"
+            />
+          </div>
           {expandedSections.has('config') && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-4 sm:p-5 border-t border-blue-100">
           {/* 1. Chọn Khối Lớp */}
           <div>
             <label className="block text-xs font-bold text-slate-800 mb-1.5">
@@ -953,14 +971,16 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
         </div>
 
         {/* 3. Nạp 2 file Excel nhận xét cho loại H và loại T theo từng Khối (1 -> 5) */}
-        <div className="space-y-4">
-          <AccordionHeader
-            sectionKey="uploadMenu"
-            title="3. Menu Khối nạp file Excel nhận xét loại H và loại T (Khối 1 đến 5)"
-            subtitle="Nhấp chọn từng Khối (1, 2, 3, 4, 5) bên dưới để nạp nhận xét tương ứng. Khi xuất file Excel, mỗi lớp sẽ tự động lấy đúng nhận xét của khối đó."
-          />
+        <div className="rounded-2xl border border-purple-200/80 overflow-hidden shadow-2xs">
+          <div className="bg-purple-50/70">
+            <AccordionHeader
+              sectionKey="uploadMenu"
+              title="Menu Khối nạp file Excel nhận xét loại H và loại T (Khối 1 đến 5)"
+              subtitle="Nhấp chọn từng Khối (1, 2, 3, 4, 5) bên dưới để nạp nhận xét tương ứng. Khi xuất file Excel, mỗi lớp sẽ tự động lấy đúng nhận xét của khối đó."
+            />
+          </div>
           {expandedSections.has('uploadMenu') && (
-          <>
+          <div className="bg-white p-4 sm:p-5 border-t border-purple-100 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-2">
             {/* Nút sao chép tiện ích */}
             <button
@@ -1132,19 +1152,21 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
               )}
             </div>
           </div>
-          </>
+          </div>
           )}
         </div>
 
         {/* Ghi chú quy tắc tự động lặp lại nhận xét + Nút Thực hiện Xuất file Excel */}
-        <div className="space-y-4">
-          <AccordionHeader
-            sectionKey="export"
-            title="4. Xuất file Excel đánh giá"
-            subtitle="Quy tắc tự động lặp lại nhận xét theo Khối & nút thực hiện xuất file"
-          />
+        <div className="rounded-2xl border border-emerald-200/80 overflow-hidden shadow-2xs">
+          <div className="bg-emerald-50/70">
+            <AccordionHeader
+              sectionKey="export"
+              title="Xuất file Excel đánh giá"
+              subtitle="Quy tắc tự động lặp lại nhận xét theo Khối & nút thực hiện xuất file"
+            />
+          </div>
           {expandedSections.has('export') && (
-          <>
+          <div className="bg-white p-4 sm:p-5 border-t border-emerald-100 space-y-4">
           <div className="flex items-start gap-2.5 p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-medium">
             <HelpCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <p>
@@ -1160,32 +1182,34 @@ export const StudentCommentsManager: React.FC<StudentCommentsManagerProps> = ({
             <button
               type="button"
               onClick={handleExecuteExport}
-              className="w-full sm:w-auto px-7 py-3 bg-[#0070F3] hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+              className="w-full sm:w-auto px-7 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
             >
               <FileSpreadsheet className="w-4 h-4" />
               <span>Thực hiện & Xuất file Excel đánh giá</span>
             </button>
           </div>
-          </>
+          </div>
           )}
         </div>
 
-        {/* Live Preview Section (Khớp bố cục ảnh 2) — accordion, thu gọn mặc định vì bảng dài */}
+        {/* Live Preview Section — accordion, thu gọn mặc định vì bảng dài */}
         {previewClass && previewStudents.length > 0 && (
-          <div className="border border-slate-200 rounded-2xl overflow-hidden mt-6">
-            <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+          <div className="border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="px-4 py-1 sm:px-5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
               <button
                 type="button"
                 onClick={() => toggleSection('preview')}
-                className="flex-1 flex items-center justify-between gap-2 text-left cursor-pointer"
+                className="flex-1 flex items-center justify-between gap-2.5 text-left cursor-pointer py-3"
               >
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <FileText className="w-4 h-4 text-[#0070F3]" />
-                  Xem trước bố cục xuất file (Mẫu lớp {previewClass.name} - Ảnh 2):
+                <span className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4" />
+                  </span>
+                  Xem trước bố cục xuất file (Mẫu lớp {previewClass.name})
                 </span>
                 <ChevronDown
-                  className={`w-4 h-4 text-slate-500 shrink-0 transition-transform ${
-                    expandedSections.has('preview') ? 'rotate-180' : ''
+                  className={`w-5 h-5 text-slate-400 shrink-0 transition-transform duration-200 ${
+                    expandedSections.has('preview') ? 'rotate-180 text-slate-700' : ''
                   }`}
                 />
               </button>
