@@ -204,6 +204,31 @@ export async function createTopic(grade: number, name: string): Promise<string> 
 }
 
 /**
+ * Đổi tên chủ đề
+ */
+export async function renameTopic(topicId: string, name: string): Promise<void> {
+  const { error } = await supabase
+    .from('quiz_topics')
+    .update({ name: name.trim() })
+    .eq('id', topicId);
+
+  if (error) {
+    throw new Error(`Không thể đổi tên chủ đề: ${error.message}`);
+  }
+}
+
+/**
+ * Xóa chủ đề (xóa luôn toàn bộ câu hỏi trong chủ đề vì có khóa ngoại ON DELETE CASCADE)
+ */
+export async function deleteTopic(topicId: string): Promise<void> {
+  const { error } = await supabase.from('quiz_topics').delete().eq('id', topicId);
+
+  if (error) {
+    throw new Error(`Không thể xóa chủ đề: ${error.message}`);
+  }
+}
+
+/**
  * Bật / tắt trạng thái kích hoạt của chủ đề (cho phép học sinh thấy khi thi)
  */
 export async function setTopicActive(topicId: string, isActive: boolean): Promise<void> {
@@ -296,6 +321,8 @@ export async function listQuestionsByTopic(topicId: string): Promise<QuizQuestio
  * Tạo câu hỏi mới trong chủ đề
  */
 export async function createQuestion(input: Omit<QuizQuestion, 'id'>): Promise<string> {
+  const { data: userRes } = await supabase.auth.getUser();
+
   const { data, error } = await supabase
     .from('quiz_questions')
     .insert({
@@ -304,6 +331,10 @@ export async function createQuestion(input: Omit<QuizQuestion, 'id'>): Promise<s
       options: input.options,
       correct_index: input.correctIndex,
       image_url: input.imageUrl || null,
+      // Can luu created_by de giao vien (khong phai admin) sau nay con duoc sua/xoa
+      // chinh cau hoi minh tao - RLS "quiz_questions_teacher_update/delete" doi hoi
+      // created_by = auth.uid(), de trong se khien khong ai tru admin sua/xoa duoc.
+      created_by: userRes?.user?.id || null,
     })
     .select('id')
     .single();
@@ -313,6 +344,25 @@ export async function createQuestion(input: Omit<QuizQuestion, 'id'>): Promise<s
   }
 
   return data.id;
+}
+
+/**
+ * Sửa nội dung câu hỏi
+ */
+export async function updateQuestion(id: string, input: Omit<QuizQuestion, 'id'>): Promise<void> {
+  const { error } = await supabase
+    .from('quiz_questions')
+    .update({
+      content: input.question.trim(),
+      options: input.options,
+      correct_index: input.correctIndex,
+      image_url: input.imageUrl || null,
+    })
+    .eq('id', id);
+
+  if (error) {
+    throw new Error(`Không thể sửa câu hỏi: ${error.message}`);
+  }
 }
 
 /**

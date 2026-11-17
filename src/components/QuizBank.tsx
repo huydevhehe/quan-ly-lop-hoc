@@ -9,6 +9,7 @@ import {
   BookOpen,
   FileSpreadsheet,
   Trash2,
+  Pencil,
   Search,
   Filter,
   Eye,
@@ -33,6 +34,7 @@ import {
   listExamResults,
   deleteExamResult,
   createTopic,
+  updateQuestion,
   generateSampleExcelTemplate,
   parseQuestionsExcelFile,
   bulkInsertQuestions,
@@ -116,6 +118,8 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
   const [newImageUrl, setNewImageUrl] = useState('');
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [imageUploadError, setImageUploadError] = useState('');
+  // null = dang them cau hoi moi; co id = dang sua cau hoi da co (khong doi duoc khoi/chu de)
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
 
   // Mỗi khi đổi khối lớp trong form thêm câu hỏi, reset lựa chọn chủ đề (vì chủ đề phụ thuộc khối)
   useEffect(() => {
@@ -153,6 +157,31 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
     }
   };
 
+  const resetQuestionForm = () => {
+    setShowAddModal(false);
+    setEditingQuestionId(null);
+    setNewQuestion('');
+    setNewOptions(['', '', '', '']);
+    setNewTopicChoice('');
+    setNewTopicName('');
+    setNewImagePreview(null);
+    setNewImageUrl('');
+    setImageUploadError('');
+  };
+
+  const openEditQuestion = (quiz: QuizQuestion) => {
+    setEditingQuestionId(quiz.id);
+    setNewGrade(quiz.grade);
+    setNewTopicChoice(quiz.topic);
+    setNewQuestion(quiz.question);
+    setNewOptions(quiz.options.length === 4 ? [...quiz.options] : ['', '', '', '']);
+    setNewCorrectIndex(quiz.correctIndex);
+    setNewImageUrl(quiz.imageUrl || '');
+    setNewImagePreview(quiz.imageUrl || null);
+    setImageUploadError('');
+    setShowAddModal(true);
+  };
+
   const handleAddQuestionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newQuestion.trim()) return;
@@ -163,35 +192,33 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
     }
 
     try {
-      let topicId = newTopicChoice;
-      if (newTopicChoice === '__new__') {
-        const topicName = newTopicName.trim() || 'Chủ đề chung';
-        topicId = await createTopic(newGrade, topicName);
-      }
-
-      await createQuestion({
+      const payload = {
         grade: newGrade,
         subject: 'Tin học',
-        topic: topicId,
+        topic: newTopicChoice,
         question: newQuestion.trim(),
         options: newOptions.map((opt, i) => opt.trim() || `Đáp án ${String.fromCharCode(65 + i)}`),
         correctIndex: newCorrectIndex,
         explanation: '',
         imageUrl: newImageUrl || undefined,
-      });
+      };
+
+      if (editingQuestionId) {
+        await updateQuestion(editingQuestionId, payload);
+      } else {
+        let topicId = newTopicChoice;
+        if (newTopicChoice === '__new__') {
+          const topicName = newTopicName.trim() || 'Chủ đề chung';
+          topicId = await createTopic(newGrade, topicName);
+        }
+        await createQuestion({ ...payload, topic: topicId });
+      }
 
       await refreshQuestionBank();
-      setShowAddModal(false);
-      setNewQuestion('');
-      setNewOptions(['', '', '', '']);
-      setNewTopicChoice('');
-      setNewTopicName('');
-      setNewImagePreview(null);
-      setNewImageUrl('');
-      setImageUploadError('');
+      resetQuestionForm();
       soundManager.playFanfare();
     } catch (err: any) {
-      alert(`Không thể thêm câu hỏi: ${err.message || 'Lỗi không xác định'}`);
+      alert(`Không thể lưu câu hỏi: ${err.message || 'Lỗi không xác định'}`);
     }
   };
 
@@ -466,7 +493,10 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                   </button>
 
                   <button
-                    onClick={() => setShowAddModal(true)}
+                    onClick={() => {
+                      resetQuestionForm();
+                      setShowAddModal(true);
+                    }}
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
@@ -490,7 +520,10 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
               <div className="col-span-2 text-center py-12 bg-white rounded-3xl border border-dashed border-slate-200">
                 <p className="text-slate-400 text-sm">Chưa có câu hỏi nào cho khối lớp này.</p>
                 <button
-                  onClick={() => setShowAddModal(true)}
+                  onClick={() => {
+                    resetQuestionForm();
+                    setShowAddModal(true);
+                  }}
                   className="mt-3 px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl"
                 >
                   + Thêm câu hỏi ngay
@@ -552,13 +585,22 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                   <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end text-xs">
                     <div className="flex items-center gap-2">
                       {isAdmin && (
-                        <button
-                          onClick={() => handleDeleteQuestion(quiz.id)}
-                          className="text-slate-400 hover:text-rose-600 transition-colors p-1"
-                          title="Xóa câu hỏi"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <>
+                          <button
+                            onClick={() => openEditQuestion(quiz)}
+                            className="text-slate-400 hover:text-blue-600 transition-colors p-1"
+                            title="Sửa câu hỏi"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteQuestion(quiz.id)}
+                            className="text-slate-400 hover:text-rose-600 transition-colors p-1"
+                            title="Xóa câu hỏi"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -841,7 +883,9 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
           <div className="bg-white rounded-3xl shadow-xl border border-slate-200 w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-slate-800 text-base">Thêm câu hỏi trắc nghiệm Tin học</h3>
+            <h3 className="font-bold text-slate-800 text-base">
+              {editingQuestionId ? 'Sửa câu hỏi trắc nghiệm' : 'Thêm câu hỏi trắc nghiệm Tin học'}
+            </h3>
 
             <form onSubmit={handleAddQuestionSubmit} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -850,7 +894,8 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                   <select
                     value={newGrade}
                     onChange={(e) => setNewGrade(Number(e.target.value))}
-                    className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
+                    disabled={!!editingQuestionId}
+                    className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white disabled:bg-slate-50 disabled:text-slate-400"
                   >
                     <option value={1}>Khối 1</option>
                     <option value={2}>Khối 2</option>
@@ -864,7 +909,8 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                   <select
                     value={newTopicChoice}
                     onChange={(e) => setNewTopicChoice(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
+                    disabled={!!editingQuestionId}
+                    className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white disabled:bg-slate-50 disabled:text-slate-400"
                     required
                   >
                     <option value="">-- Chọn chủ đề --</option>
@@ -970,7 +1016,7 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={resetQuestionForm}
                   className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                 >
                   Hủy
@@ -979,7 +1025,7 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                   type="submit"
                   className="px-4 py-1.5 text-xs font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer"
                 >
-                  Lưu câu hỏi
+                  {editingQuestionId ? 'Lưu thay đổi' : 'Lưu câu hỏi'}
                 </button>
               </div>
             </form>

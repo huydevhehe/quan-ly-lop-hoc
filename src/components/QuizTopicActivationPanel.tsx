@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { CheckSquare, Square, Plus, BookOpen, Layers, Check, Loader2, Lock, LockOpen } from 'lucide-react';
-import { listTopics, setTopicActive, setTopicForced, createTopic, QuizTopicItem } from '../services/quizService';
+import { CheckSquare, Square, Plus, BookOpen, Layers, Check, Loader2, Lock, LockOpen, Pencil, Trash2, X } from 'lucide-react';
+import { listTopics, setTopicActive, setTopicForced, createTopic, renameTopic, deleteTopic, QuizTopicItem } from '../services/quizService';
 
 interface QuizTopicActivationPanelProps {
   grade: number | 'all';
@@ -20,6 +20,10 @@ export const QuizTopicActivationPanel: React.FC<QuizTopicActivationPanelProps> =
   const [newTopicGrade, setNewTopicGrade] = useState<number>(grade === 'all' ? 1 : grade);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [forcingTopicId, setForcingTopicId] = useState<string | null>(null);
+  const [renamingTopicId, setRenamingTopicId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [isSavingRename, setIsSavingRename] = useState(false);
+  const [deletingTopicId, setDeletingTopicId] = useState<string | null>(null);
 
   const fetchTopics = async () => {
     setLoading(true);
@@ -126,6 +130,57 @@ export const QuizTopicActivationPanel: React.FC<QuizTopicActivationPanelProps> =
     }
   };
 
+  const startRenameTopic = (e: React.MouseEvent, topic: QuizTopicItem) => {
+    e.stopPropagation();
+    setRenamingTopicId(topic.id);
+    setRenameValue(topic.name);
+  };
+
+  const cancelRenameTopic = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setRenamingTopicId(null);
+    setRenameValue('');
+  };
+
+  const saveRenameTopic = async (e: React.FormEvent | React.MouseEvent, topicId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!renameValue.trim()) return;
+    setIsSavingRename(true);
+    try {
+      await renameTopic(topicId, renameValue.trim());
+      setTopics((prev) =>
+        prev.map((t) => (t.id === topicId ? { ...t, name: renameValue.trim() } : t))
+      );
+      setRenamingTopicId(null);
+    } catch (err: any) {
+      alert(`Không thể đổi tên chủ đề: ${err.message}`);
+    } finally {
+      setIsSavingRename(false);
+    }
+  };
+
+  const handleDeleteTopic = async (e: React.MouseEvent, topic: QuizTopicItem) => {
+    e.stopPropagation();
+    if (
+      !confirm(
+        `Xóa chủ đề "${topic.name}"?\n\nToàn bộ ${topic.questionCount} câu hỏi trong chủ đề này sẽ bị xóa vĩnh viễn.`
+      )
+    ) {
+      return;
+    }
+    setDeletingTopicId(topic.id);
+    try {
+      await deleteTopic(topic.id);
+      setTopics((prev) => prev.filter((t) => t.id !== topic.id));
+      if (selectedTopicId === topic.id && onSelectTopic) onSelectTopic(null);
+    } catch (err: any) {
+      alert(`Không thể xóa chủ đề: ${err.message}`);
+    } finally {
+      setDeletingTopicId(null);
+    }
+  };
+
   return (
     <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-2xs space-y-4">
       {/* Header */}
@@ -197,48 +252,101 @@ export const QuizTopicActivationPanel: React.FC<QuizTopicActivationPanelProps> =
                     : 'border-slate-200 hover:border-slate-300 bg-white'
                 }`}
               >
-                <div
-                  onClick={() => onSelectTopic && onSelectTopic(isSelected ? null : topic.id)}
-                  className="flex items-center justify-between gap-2.5 cursor-pointer"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600">
-                        K{topic.grade}
-                      </span>
-                      <h4 className="text-xs font-bold text-slate-800 truncate" title={topic.name}>
-                        {topic.name}
-                      </h4>
-                      {topic.isForced && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 flex items-center gap-1 shrink-0">
-                          <Lock className="w-2.5 h-2.5" />
-                          Đang khóa
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      {topic.questionCount} câu hỏi
-                    </p>
-                  </div>
-
-                  {/* Checkbox toggle status */}
-                  <button
-                    type="button"
-                    onClick={(e) => handleToggleOne(e, topic)}
-                    className={`p-1.5 rounded-xl transition-all cursor-pointer ${
-                      topic.isActive
-                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                        : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                    }`}
-                    title={topic.isActive ? 'Đang mở cho học sinh thi' : 'Đang đóng'}
+                {renamingTopicId === topic.id ? (
+                  <form onSubmit={(e) => saveRenameTopic(e, topic.id)} className="flex items-center gap-1.5">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-1 min-w-0 px-2 py-1 text-xs font-bold border border-emerald-300 rounded-lg focus:outline-emerald-500"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isSavingRename}
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 shrink-0 cursor-pointer disabled:opacity-50"
+                      title="Lưu tên"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelRenameTopic}
+                      className="p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 shrink-0 cursor-pointer"
+                      title="Hủy"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </form>
+                ) : (
+                  <div
+                    onClick={() => onSelectTopic && onSelectTopic(isSelected ? null : topic.id)}
+                    className="flex items-center justify-between gap-2.5 cursor-pointer"
                   >
-                    {topic.isActive ? (
-                      <CheckSquare className="w-4 h-4 text-emerald-600" />
-                    ) : (
-                      <Square className="w-4 h-4 text-slate-400" />
-                    )}
-                  </button>
-                </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                          K{topic.grade}
+                        </span>
+                        <h4 className="text-xs font-bold text-slate-800 truncate" title={topic.name}>
+                          {topic.name}
+                        </h4>
+                        {topic.isForced && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 flex items-center gap-1 shrink-0">
+                            <Lock className="w-2.5 h-2.5" />
+                            Đang khóa
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {topic.questionCount} câu hỏi
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => startRenameTopic(e, topic)}
+                        className="p-1.5 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all cursor-pointer"
+                        title="Đổi tên chủ đề"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteTopic(e, topic)}
+                        disabled={deletingTopicId === topic.id}
+                        className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer disabled:opacity-50"
+                        title="Xóa chủ đề"
+                      >
+                        {deletingTopicId === topic.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                      {/* Checkbox toggle status */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleOne(e, topic)}
+                        className={`p-1.5 rounded-xl transition-all cursor-pointer ${
+                          topic.isActive
+                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                            : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                        }`}
+                        title={topic.isActive ? 'Đang mở cho học sinh thi' : 'Đang đóng'}
+                      >
+                        {topic.isActive ? (
+                          <CheckSquare className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-400" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Công tắc khóa chủ đề - chỉ hiện với chủ đề đang active */}
                 {topic.isActive && (

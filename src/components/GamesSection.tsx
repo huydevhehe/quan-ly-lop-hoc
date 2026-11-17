@@ -16,6 +16,8 @@ import {
   ExternalLink,
   Plus,
   XCircle,
+  Settings,
+  Pencil,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { PRIZE_WHEEL_ITEMS } from '../data/mockData';
@@ -50,9 +52,28 @@ export const GamesSection: React.FC = () => {
   const [wheelWinner, setWheelWinner] = useState<string | null>(null);
   const rotationAngleRef = useRef(0);
 
-  // Mystery Box state
-  const [openedBoxes, setOpenedBoxes] = useState<number[]>([]);
-  const mysteryRewards = [
+  // Cac o thuong cua Vong quay - co the them/sua/xoa, luu lai theo trinh duyet (localStorage)
+  // vi day la noi dung trang tri/tro choi, khong phai du lieu hoc tap can dong bo Supabase.
+  const WHEEL_COLOR_PALETTE = ['#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#06B6D4', '#F97316', '#14B8A6'];
+  const [wheelItems, setWheelItems] = useState<{ text: string; color: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('qllh_wheel_items');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= 2) return parsed;
+      }
+    } catch {}
+    return PRIZE_WHEEL_ITEMS.map((i) => ({ text: i.text, color: i.color }));
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('qllh_wheel_items', JSON.stringify(wheelItems));
+    } catch {}
+  }, [wheelItems]);
+  const [showWheelManageModal, setShowWheelManageModal] = useState(false);
+
+  // Mystery Box state - noi dung tung hop va so luong hop co the them/sua/xoa, luu localStorage
+  const DEFAULT_MYSTERY_REWARDS = [
     { title: '🌟 +3 Sao thi đua!', desc: 'Phần thưởng xuất sắc cho bạn may mắn nhất!' },
     { title: '🎁 1 Chiếc Sticker siêu cấp', desc: 'Nhận ngay sticker đáng yêu từ thầy cô!' },
     { title: '👏 Cả lớp dành 1 tràng pháo tay', desc: 'Âm thanh rộn ràng cổ vũ tinh thần học tập!' },
@@ -60,6 +81,23 @@ export const GamesSection: React.FC = () => {
     { title: '🎵 Bài hát tự chọn yêu thích', desc: 'Cả lớp cùng nghe giai điệu em yêu thích trong giờ ra chơi!' },
     { title: '⭐ +2 Sao chăm ngoan', desc: 'Một món quà bất ngờ tiếp thêm động lực!' },
   ];
+  const [openedBoxes, setOpenedBoxes] = useState<number[]>([]);
+  const [mysteryRewards, setMysteryRewards] = useState<{ title: string; desc: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('qllh_mystery_rewards');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= 1) return parsed;
+      }
+    } catch {}
+    return DEFAULT_MYSTERY_REWARDS;
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('qllh_mystery_rewards', JSON.stringify(mysteryRewards));
+    } catch {}
+  }, [mysteryRewards]);
+  const [showMysteryManageModal, setShowMysteryManageModal] = useState(false);
 
   // Brain Break state
   const [breakSeconds, setBreakSeconds] = useState(120);
@@ -86,7 +124,7 @@ export const GamesSection: React.FC = () => {
     const centerY = height / 2;
     const radius = width / 2 - 12;
 
-    const numSlices = PRIZE_WHEEL_ITEMS.length;
+    const numSlices = wheelItems.length;
     const sliceAngle = (2 * Math.PI) / numSlices;
 
     ctx.clearRect(0, 0, width, height);
@@ -96,7 +134,7 @@ export const GamesSection: React.FC = () => {
     ctx.rotate(rotationAngleRef.current);
 
     // Draw slices
-    PRIZE_WHEEL_ITEMS.forEach((item, i) => {
+    wheelItems.forEach((item, i) => {
       const angle = i * sliceAngle;
       ctx.beginPath();
       ctx.moveTo(0, 0);
@@ -133,7 +171,7 @@ export const GamesSection: React.FC = () => {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('🎯', centerX, centerY);
-  }, [rotationAngleRef.current]);
+  }, [rotationAngleRef.current, wheelItems]);
 
   const handleSpinWheel = () => {
     if (isSpinning) return;
@@ -164,7 +202,7 @@ export const GamesSection: React.FC = () => {
           const centerX = width / 2;
           const centerY = height / 2;
           const radius = width / 2 - 12;
-          const numSlices = PRIZE_WHEEL_ITEMS.length;
+          const numSlices = wheelItems.length;
           const sliceAngle = (2 * Math.PI) / numSlices;
 
           ctx.clearRect(0, 0, width, height);
@@ -172,7 +210,7 @@ export const GamesSection: React.FC = () => {
           ctx.translate(centerX, centerY);
           ctx.rotate(currentAngle);
 
-          PRIZE_WHEEL_ITEMS.forEach((item, i) => {
+          wheelItems.forEach((item, i) => {
             const angle = i * sliceAngle;
             ctx.beginPath();
             ctx.moveTo(0, 0);
@@ -216,9 +254,9 @@ export const GamesSection: React.FC = () => {
         setIsSpinning(false);
         // Calculate winning slice
         const normalizedAngle = (2 * Math.PI - (currentAngle % (2 * Math.PI))) % (2 * Math.PI);
-        const sliceAngle = (2 * Math.PI) / PRIZE_WHEEL_ITEMS.length;
+        const sliceAngle = (2 * Math.PI) / wheelItems.length;
         const winnerIndex = Math.floor(normalizedAngle / sliceAngle);
-        const winner = PRIZE_WHEEL_ITEMS[winnerIndex] || PRIZE_WHEEL_ITEMS[0];
+        const winner = wheelItems[winnerIndex] || wheelItems[0];
         setWheelWinner(winner.text);
         soundManager.playFanfare();
 
@@ -243,6 +281,38 @@ export const GamesSection: React.FC = () => {
       spread: 60,
       origin: { y: 0.7 }
     });
+  };
+
+  // CRUD cho cac o cua Vong quay may man
+  const handleAddWheelItem = () => {
+    const color = WHEEL_COLOR_PALETTE[wheelItems.length % WHEEL_COLOR_PALETTE.length];
+    setWheelItems((prev) => [...prev, { text: 'Ô thưởng mới', color }]);
+  };
+  const handleUpdateWheelItem = (idx: number, patch: Partial<{ text: string; color: string }>) => {
+    setWheelItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  };
+  const handleDeleteWheelItem = (idx: number) => {
+    if (wheelItems.length <= 2) {
+      alert('Vòng quay cần tối thiểu 2 ô thưởng.');
+      return;
+    }
+    setWheelItems((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // CRUD cho cac hop qua bi mat (noi dung + so luong hop)
+  const handleAddMysteryBox = () => {
+    setMysteryRewards((prev) => [...prev, { title: '🎁 Phần thưởng mới', desc: 'Nhập nội dung phần thưởng...' }]);
+  };
+  const handleUpdateMysteryBox = (idx: number, patch: Partial<{ title: string; desc: string }>) => {
+    setMysteryRewards((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  };
+  const handleDeleteMysteryBox = (idx: number) => {
+    if (mysteryRewards.length <= 1) {
+      alert('Cần tối thiểu 1 hộp quà.');
+      return;
+    }
+    setMysteryRewards((prev) => prev.filter((_, i) => i !== idx));
+    setOpenedBoxes((prev) => prev.filter((i) => i !== idx).map((i) => (i > idx ? i - 1 : i)));
   };
 
   // Brain break timer
@@ -371,9 +441,13 @@ export const GamesSection: React.FC = () => {
               <RotateCw className={`w-5 h-5 ${isSpinning ? 'animate-spin' : ''}`} />
               <span>{isSpinning ? 'Đang quay vòng...' : 'Quay thưởng ngay!'}</span>
             </button>
-            <span className="text-xs text-slate-400">
-              Có thể tùy chỉnh các ô thưởng trong tiện ích
-            </span>
+            <button
+              onClick={() => setShowWheelManageModal(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>Quản lý ô thưởng ({wheelItems.length})</span>
+            </button>
           </div>
         </div>
       )}
@@ -389,7 +463,7 @@ export const GamesSection: React.FC = () => {
               Chọn 1 hộp quà may mắn
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Cho học sinh phát biểu chọn một số từ 1 đến 6 và mở quà
+              Cho học sinh phát biểu chọn một số từ 1 đến {mysteryRewards.length} và mở quà
             </p>
           </div>
 
@@ -429,12 +503,19 @@ export const GamesSection: React.FC = () => {
             })}
           </div>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 flex items-center justify-center gap-2.5">
             <button
               onClick={() => setOpenedBoxes([])}
               className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
             >
               Đặt lại tất cả các hộp quà
+            </button>
+            <button
+              onClick={() => setShowMysteryManageModal(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>Quản lý nội dung hộp quà ({mysteryRewards.length})</span>
             </button>
           </div>
         </div>
@@ -642,6 +723,131 @@ export const GamesSection: React.FC = () => {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal: Quan ly o thuong Vong quay may man (them/sua/xoa) */}
+      {showWheelManageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl shadow-xl border border-slate-200 w-full max-w-lg p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 text-base">Quản lý ô thưởng Vòng quay</h3>
+              <button
+                onClick={() => setShowWheelManageModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {wheelItems.map((item, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={item.color}
+                    onChange={(e) => handleUpdateWheelItem(idx, { color: e.target.value })}
+                    className="w-8 h-8 rounded-lg border border-slate-200 shrink-0 cursor-pointer"
+                    title="Màu ô"
+                  />
+                  <input
+                    type="text"
+                    value={item.text}
+                    onChange={(e) => handleUpdateWheelItem(idx, { text: e.target.value })}
+                    className="flex-1 px-3 py-1.5 text-xs border border-slate-200 rounded-lg"
+                    placeholder="Nội dung ô thưởng"
+                  />
+                  <button
+                    onClick={() => handleDeleteWheelItem(idx)}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors shrink-0 cursor-pointer"
+                    title="Xóa ô này"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <button
+                onClick={handleAddWheelItem}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thêm ô thưởng</span>
+              </button>
+              <button
+                onClick={() => setShowWheelManageModal(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Xong
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Quan ly noi dung + so luong Hop qua bi mat (them/sua/xoa) */}
+      {showMysteryManageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl shadow-xl border border-slate-200 w-full max-w-lg p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 text-base">Quản lý nội dung Hộp quà bí mật</h3>
+              <button
+                onClick={() => setShowMysteryManageModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {mysteryRewards.map((reward, idx) => (
+                <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-extrabold text-slate-400 font-mono">Hộp #{idx + 1}</span>
+                    <button
+                      onClick={() => handleDeleteMysteryBox(idx)}
+                      className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                      title="Xóa hộp này"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={reward.title}
+                    onChange={(e) => handleUpdateMysteryBox(idx, { title: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs font-bold border border-slate-200 rounded-lg"
+                    placeholder="Tiêu đề phần thưởng (VD: 🌟 +3 Sao thi đua!)"
+                  />
+                  <input
+                    type="text"
+                    value={reward.desc}
+                    onChange={(e) => handleUpdateMysteryBox(idx, { desc: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg"
+                    placeholder="Mô tả ngắn"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <button
+                onClick={handleAddMysteryBox}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thêm hộp quà</span>
+              </button>
+              <button
+                onClick={() => setShowMysteryManageModal(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Xong
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

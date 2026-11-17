@@ -5,6 +5,9 @@ vi.mock('../../lib/supabaseClient', () => {
     supabase: {
       from: vi.fn(),
       rpc: vi.fn(),
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }),
+      },
     },
   };
 });

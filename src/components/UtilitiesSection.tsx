@@ -90,10 +90,9 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
   const [groupCount, setGroupCount] = useState(4);
   const [generatedGroups, setGeneratedGroups] = useState<{ name: string; members: Student[] }[]>([]);
 
-  // Excel paste/import state
-  const [excelText, setExcelText] = useState(
-    `Nguyễn Gia Khiêm\tNam\t15/04/2016\nPhạm Quỳnh Chi\tNữ\t20/09/2016\nVũ Đức Minh\tNam\t08/11/2016\nLê Thùy Dung\tNữ\t02/03/2016`
-  );
+  // Excel paste/import state - de trong, KHONG nhoi san du lieu mau (truoc day de san 4 hoc sinh
+  // gia khien giao vien bam nham "Nhap ngay vao lop" la bi nhap hoc sinh ao vao lop that)
+  const [excelText, setExcelText] = useState('');
   const [importSuccess, setImportSuccess] = useState(false);
   const [importError, setImportError] = useState('');
   const [isImporting, setIsImporting] = useState(false);
@@ -552,7 +551,7 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
               rows={6}
               value={excelText}
               onChange={(e) => setExcelText(e.target.value)}
-              placeholder="Nguyễn Văn A [Tab] Nam [Tab] 12/03/2016..."
+              placeholder={'Nguyễn Văn A\tNam\t12/03/2016\nTrần Thị B\tNữ\t05/07/2016\n(dán từ Excel, mỗi dòng 1 học sinh)'}
               className="w-full p-3 font-mono text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
             />
             <p className="text-[11px] text-slate-400">
