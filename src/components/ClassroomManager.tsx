@@ -294,22 +294,30 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   const [currentView, setCurrentView] = useState<'list' | 'detail'>('list');
   const [currentClassId, setCurrentClassId] = useState<string>(() => selectedClassIdExternal || '');
   const [subTab, setSubTab] = useState<'week' | 'student' | 'grade'>('week');
-  // Tuan dang xem - truoc day luon reset ve 9 khi thoat man "Quan ly lop hoc" roi vao lai (component
-  // unmount/remount), khien giao vien tuong nham la mat du lieu diem danh/danh gia cua tuan dang lam.
-  // Du lieu tung tuan van luu dung trong Supabase theo so tuan - chi so "dang xem tuan nao" la chua
-  // duoc nho, nen gio luu vao localStorage de giu nguyen tuan dang chon.
-  const [currentWeek, setCurrentWeek] = useState<number>(() => {
+  // Tuan dang xem CUA TUNG LOP - truoc day la 1 bien dung chung cho ca app, nen chon tuan 15
+  // o lop A roi mo lop B la lop B cung bi hien tuan 15 theo (sai, moi lop phai doc lap).
+  // Luu theo map {classId: weekNumber} vao localStorage de vua doc lap theo lop, vua khong
+  // bi reset khi thoat man "Quan ly lop hoc" roi vao lai.
+  const [weekByClass, setWeekByClass] = useState<Record<string, number>>(() => {
     try {
-      const saved = parseInt(localStorage.getItem('qllh_current_week') || '', 10);
-      if (!isNaN(saved) && saved >= 1 && saved <= 35) return saved;
+      const saved = localStorage.getItem('qllh_week_by_class');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
     } catch {}
-    return 9;
+    return {};
   });
   useEffect(() => {
     try {
-      localStorage.setItem('qllh_current_week', String(currentWeek));
+      localStorage.setItem('qllh_week_by_class', JSON.stringify(weekByClass));
     } catch {}
-  }, [currentWeek]);
+  }, [weekByClass]);
+  const currentWeek = (currentClassId && weekByClass[currentClassId]) || 9;
+  const setCurrentWeek = (week: number) => {
+    if (!currentClassId) return;
+    setWeekByClass((prev) => ({ ...prev, [currentClassId]: week }));
+  };
   const [currentTerm, setCurrentTerm] = useState<'hk1' | 'hk2'>('hk1');
 
   useEffect(() => {
@@ -1789,8 +1797,6 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                   CSDL độc lập: {currentUser?.fullName || 'Giáo viên'} ({currentUser?.role === 'admin' ? 'Quản trị viên' : 'Giáo viên'})
                 </span>
               </div>
-              <p className="text-xs font-bold text-slate-500 uppercase">TUẦN HIỆN TẠI: {currentWeek}/35</p>
-
               <div className="flex flex-wrap items-center gap-2 mt-4">
                 {canManage && (
                   <button
@@ -1925,7 +1931,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                       <Users className={`w-3.5 h-3.5 ${gradeColor.iconText}`} />
                       <span>{hsCount} học sinh</span>
                       <span className="text-slate-300">·</span>
-                      <span>Tuần {currentWeek}/35</span>
+                      <span>Tuần {weekByClass[cls.id] || 9}/35</span>
                     </div>
 
                     <div className="flex items-center justify-end mt-3">
