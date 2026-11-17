@@ -2,16 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   Wrench,
   Clock,
-  FileSpreadsheet,
   Users2,
   Play,
   Pause,
   RotateCcw,
   Maximize2,
   Minimize2,
-  Check,
-  Download,
-  Upload,
   Sparkles,
   Shuffle,
   Link2,
@@ -25,8 +21,6 @@ import { StudentCommentsManager } from './StudentCommentsManager';
 import { Award } from 'lucide-react';
 import { SaveLinkForm } from './resources/SaveLinkForm';
 import { listResources, deleteResource } from '../services/resourcesService';
-import { upsertStudents } from '../services/studentsService';
-import { translateSupabaseError } from '../utils/errorMessages';
 import { Resource } from '../types';
 
 interface UtilitiesSectionProps {
@@ -46,10 +40,10 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
   isAdmin = true,
   currentUser,
 }) => {
-  const [activeTab, setActiveTab] = useState<'comments' | 'timer' | 'teams' | 'excel' | 'links'>(() => {
+  const [activeTab, setActiveTab] = useState<'comments' | 'timer' | 'teams' | 'links'>(() => {
     try {
       const saved = localStorage.getItem('qllh_utilities_subtab');
-      if (saved === 'comments' || saved === 'timer' || saved === 'teams' || saved === 'excel' || saved === 'links') {
+      if (saved === 'comments' || saved === 'timer' || saved === 'teams' || saved === 'links') {
         return saved;
       }
     } catch {}
@@ -90,12 +84,6 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
   const [groupCount, setGroupCount] = useState(4);
   const [generatedGroups, setGeneratedGroups] = useState<{ name: string; members: Student[] }[]>([]);
 
-  // Excel paste/import state - de trong, KHONG nhoi san du lieu mau (truoc day de san 4 hoc sinh
-  // gia khien giao vien bam nham "Nhap ngay vao lop" la bi nhap hoc sinh ao vao lop that)
-  const [excelText, setExcelText] = useState('');
-  const [importSuccess, setImportSuccess] = useState(false);
-  const [importError, setImportError] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
 
   // Luôn có 1 object hợp lệ để render, tránh crash trắng trang khi classrooms chưa tải
   // xong (vd vừa tải lại trang trong khi tab này đang mở) — classrooms rỗng thì [0] vẫn undefined.
@@ -182,54 +170,6 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
     });
   };
 
-  // Excel import logic
-  const handleParseAndImport = async () => {
-    setImportError('');
-    const lines = excelText.trim().split('\n');
-    const toInsert: { code: string; name: string; avatar: string }[] = [];
-
-    lines.forEach((line, index) => {
-      const parts = line.split(/[\t,;]+/);
-      if (parts.length >= 1 && parts[0].trim()) {
-        const name = parts[0].trim();
-        const gender: 'Nam' | 'Nữ' = parts[1]?.toLowerCase().includes('nữ') ? 'Nữ' : 'Nam';
-
-        toInsert.push({
-          code: `HS${(classStudents.length + index + 1).toString().padStart(3, '0')}`,
-          name,
-          avatar: gender === 'Nam' ? '👦' : '👧',
-        });
-      }
-    });
-
-    if (toInsert.length === 0) return;
-
-    setIsImporting(true);
-    try {
-      const inserted = await upsertStudents(selectedClassId, toInsert);
-      setStudents((prev) => [...prev, ...inserted]);
-      setImportSuccess(true);
-      soundManager.playFanfare();
-      setTimeout(() => setImportSuccess(false), 3000);
-    } catch (err: any) {
-      setImportError(translateSupabaseError(err, 'Không thể nhập danh sách học sinh. Vui lòng kiểm tra lại dữ liệu và thử lại.'));
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
-  const handleDownloadSampleCsv = () => {
-    const csvContent =
-      'data:text/csv;charset=utf-8,Họ và tên,Giới tính,Ngày sinh\nNguyễn Văn An,Nam,12/03/2016\nTrần Thị Mai,Nữ,05/06/2016\nLê Hoàng Long,Nam,18/08/2016';
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'mau_danh_sach_hoc_sinh.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   const formatTime = (totalSecs: number) => {
     const mins = Math.floor(totalSecs / 60);
     const secs = totalSecs % 60;
@@ -292,19 +232,6 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
             <Users2 className="w-3.5 h-3.5" />
             <span>Chia nhóm học tập</span>
           </button>
-          {isAdmin && (
-            <button
-              onClick={() => setActiveTab('excel')}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'excel'
-                  ? 'bg-white text-emerald-600 shadow-sm ring-2 ring-emerald-100'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-              }`}
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Nhập danh sách Excel</span>
-            </button>
-          )}
           <button
             onClick={() => setActiveTab('links')}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
@@ -514,76 +441,6 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
               ))}
             </div>
           )}
-        </div>
-      )}
-
-      {/* TAB 3: EXCEL IMPORT */}
-      {activeTab === 'excel' && (
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-2xs space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">
-                NHẬP HỌC SINH TỪ EXCEL
-              </span>
-              <h3 className="text-xl font-bold text-slate-900 mt-1">
-                Thêm danh sách học sinh vào {currentClass.name}
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Sao chép các cột từ tệp Excel (Họ tên, Giới tính, Ngày sinh) và dán trực tiếp vào khung dưới
-              </p>
-            </div>
-
-            <button
-              onClick={handleDownloadSampleCsv}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-semibold transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span>Tải file mẫu Excel (.CSV)</span>
-            </button>
-          </div>
-
-          {/* Textarea for excel paste */}
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold text-slate-700">
-              Dán dữ liệu từ bảng tính (Mỗi dòng một học sinh):
-            </label>
-            <textarea
-              rows={6}
-              value={excelText}
-              onChange={(e) => setExcelText(e.target.value)}
-              placeholder={'Nguyễn Văn A\tNam\t12/03/2016\nTrần Thị B\tNữ\t05/07/2016\n(dán từ Excel, mỗi dòng 1 học sinh)'}
-              className="w-full p-3 font-mono text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
-            />
-            <p className="text-[11px] text-slate-400">
-              Hệ thống tự động phân tích dấu Tab, dấu phẩy hoặc dấu chấm phẩy giữa các cột.
-            </p>
-            {importError && (
-              <p className="text-xs font-bold text-rose-600">{importError}</p>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
-            <div className="text-xs text-slate-500">
-              Sẽ thêm vào: <strong className="text-slate-800">{currentClass.name}</strong>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {importSuccess && (
-                <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                  <Check className="w-4 h-4" />
-                  Đã nhập thành công vào danh sách!
-                </span>
-              )}
-              <button
-                onClick={handleParseAndImport}
-                disabled={isImporting}
-                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                <Upload className="w-4 h-4" />
-                <span>{isImporting ? 'Đang nhập...' : 'Nhập ngay vào lớp'}</span>
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
