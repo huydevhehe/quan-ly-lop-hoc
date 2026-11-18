@@ -27,7 +27,6 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Student, UserAccount } from '../types';
-import { StudentCommentsManager } from './StudentCommentsManager';
 import { listMyClasses, createClass, updateClass, deleteClass } from '../services/classesService';
 import { listStudentsByClass, upsertStudents, deleteStudent } from '../services/studentsService';
 import { listSchoolYears, createSchoolYear, SchoolYearItem } from '../services/schoolYearsService';
@@ -40,6 +39,14 @@ import {
 import { getClassScores, saveScore } from '../services/scoresService';
 import { getClassWeekDates, saveClassWeekDates } from '../services/weekDatesService';
 import { getMyTimetable, saveMyTimetable } from '../services/timetableService';
+import { getAllCommentBanks } from '../services/commentBankService';
+import {
+  getAttendanceSummaryForClasses,
+  getWeekRangeForTerm,
+  pickCommentBank,
+  resolveClassGrade,
+  resolveClassification,
+} from '../services/reportsExportService';
 import { RandomPickerModal } from './RandomPickerModal';
 
 export interface ClassItem {
@@ -472,7 +479,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
 
   // Import Excel modal state & ref
   const [showImportExcelModal, setShowImportExcelModal] = useState(false);
-  const [showCommentsExportModal, setShowCommentsExportModal] = useState(false);
+  const [isExportingComments, setIsExportingComments] = useState(false);
   const excelFileInputRef = useRef<HTMLInputElement>(null);
 
   // Random picker modal state
@@ -1183,6 +1190,78 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Danh_sach_lop');
     const fileName = `Danh_Sach_Lop_${currentClass?.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'Lop'}.xlsx`;
     XLSX.writeFile(workbook, fileName);
+  };
+
+  // Action: Export full class roster with attendance summary + per-student comment columns
+  const handleExportStudentCommentsExcel = async () => {
+    if (!currentClassId || classStudents.length === 0) {
+      alert('Lớp chưa có học sinh để xuất file!');
+      return;
+    }
+    setIsExportingComments(true);
+    try {
+      const grade = resolveClassGrade(currentClass?.grade, currentClass?.name || '');
+      const { start, end } = getWeekRangeForTerm(currentTerm);
+      const [banksT, banksH, attendanceSummary] = await Promise.all([
+        getAllCommentBanks('T'),
+        getAllCommentBanks('H'),
+        getAttendanceSummaryForClasses([currentClassId], start, end),
+      ]);
+      const commentsT = pickCommentBank(grade, 'T', { T: banksT, H: banksH });
+      const commentsH = pickCommentBank(grade, 'H', { T: banksT, H: banksH });
+      let idxT = 0;
+      let idxH = 0;
+
+      const dataRows = sortedStudents.map((st, idx) => {
+        const key = `${st.id}_${currentTerm}`;
+        const rec = gradeData[key];
+        const classification = resolveClassification(rec?.rank, rec?.total);
+        let comment = '';
+        if (classification === 'T') {
+          comment = commentsT.length > 0 ? commentsT[idxT % commentsT.length] : '';
+          idxT++;
+        } else {
+          comment = commentsH.length > 0 ? commentsH[idxH % commentsH.length] : '';
+          idxH++;
+        }
+        const att = attendanceSummary[st.id] || { present: 0, excused: 0, unexcused: 0 };
+        return {
+          STT: idx + 1,
+          'Mã học sinh': st.code,
+          'Họ và tên': st.name,
+          'Ngày sinh': st.dob || '',
+          'Giới tính': st.gender || '',
+          'Có mặt': att.present,
+          'Vắng có phép': att.excused,
+          'Vắng không phép': att.unexcused,
+          'Xếp loại': classification,
+          'Nhận xét': comment,
+        };
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(dataRows);
+      worksheet['!cols'] = [
+        { wch: 6 },
+        { wch: 14 },
+        { wch: 24 },
+        { wch: 13 },
+        { wch: 10 },
+        { wch: 10 },
+        { wch: 12 },
+        { wch: 14 },
+        { wch: 10 },
+        { wch: 60 },
+      ];
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Danh_gia_hoc_sinh');
+      const termLabel = currentTerm === 'hk1' ? 'HK1' : 'Ca_Nam';
+      const fileName = `Danh_Gia_${currentClass?.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'Lop'}_${termLabel}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+    } catch (err: any) {
+      alert(`Không thể xuất file đánh giá: ${err.message || err}`);
+    } finally {
+      setIsExportingComments(false);
+    }
   };
 
   // Action: Export Sample Template Excel (Ảnh 2)
@@ -2429,11 +2508,12 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setShowCommentsExportModal(true)}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 text-xs shadow-2xs whitespace-nowrap cursor-pointer active:scale-95"
+                    onClick={handleExportStudentCommentsExcel}
+                    disabled={isExportingComments}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg font-bold transition flex items-center gap-1.5 text-xs shadow-2xs whitespace-nowrap cursor-pointer active:scale-95 disabled:opacity-60 disabled:cursor-wait"
                   >
                     <ClipboardList className="w-3.5 h-3.5" />
-                    <span>Xuất đánh giá</span>
+                    <span>{isExportingComments ? 'Đang xuất...' : 'Xuất đánh giá'}</span>
                   </button>
 
                   <button
@@ -2992,18 +3072,6 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             <p className="mt-4 text-xs md:text-sm text-slate-900 font-semibold leading-relaxed">
               Cột bắt buộc: Mã học sinh, Họ và tên. Tối đa 200 học sinh, file tối đa 2 MB (.xlsx hoặc .xls). Bạn có thể dùng file đã xuất từ lớp này để thêm học sinh mới.
             </p>
-          </div>
-        </div>
-      )}
-
-      {showCommentsExportModal && (
-        <div className="fixed inset-0 bg-black/50 z-[120] flex justify-center items-center px-4 backdrop-blur-xs overflow-y-auto py-6">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl p-4 md:p-6 relative animate-fadeIn max-h-[90vh] overflow-y-auto">
-            <StudentCommentsManager
-              isModal
-              onCloseModal={() => setShowCommentsExportModal(false)}
-              currentUser={currentUser}
-            />
           </div>
         </div>
       )}
