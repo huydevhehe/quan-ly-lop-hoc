@@ -1106,7 +1106,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
         const rawSum = (!isNaN(ltNum) ? ltNum : 0) + (!isNaN(thNum) ? thNum : 0);
         const roundedTotal = Math.round(rawSum);
         updated.total = roundedTotal.toString();
-        updated.rank = roundedTotal >= 9 ? 'T' : 'H';
+        updated.rank = roundedTotal >= 9 ? 'T' : roundedTotal >= 5 ? 'H' : 'C';
       } else {
         updated.total = '';
         updated.rank = '';

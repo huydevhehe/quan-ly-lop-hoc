@@ -129,7 +129,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [activeTab, selectedYear, currentUser?.id, currentUser?.username]);
 
   const userFilteredClasses = sidebarClasses;
-  const classesInCurrentYear = userFilteredClasses.filter((c) => c.year === selectedYear);
+  const classesInCurrentYear = userFilteredClasses
+    .filter((c) => c.year === selectedYear)
+    .sort((a, b) => {
+      const gradeDiff = (parseInt(a.grade.replace(/[^0-9]/g, ''), 10) || 0) - (parseInt(b.grade.replace(/[^0-9]/g, ''), 10) || 0);
+      if (gradeDiff !== 0) return gradeDiff;
+      return a.name.localeCompare(b.name, 'vi', { numeric: true });
+    });
 
   const handleCopyCode = (e: React.MouseEvent) => {
     e.stopPropagation();

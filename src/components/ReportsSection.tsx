@@ -81,9 +81,10 @@ interface GradeRecord {
 interface ReportsSectionProps {
   isAdmin?: boolean;
   currentUser?: UserAccount;
+  selectedYear?: string;
 }
 
-export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, currentUser }) => {
+export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, currentUser, selectedYear }) => {
   // Classes list
   const [classesList, setClassesList] = useState<ClassItem[]>([]);
 
@@ -165,8 +166,18 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
   const [studentAttendanceHistory, setStudentAttendanceHistory] = useState<StudentAttendanceWeek[]>([]);
   const [loadingStudentDetail, setLoadingStudentDetail] = useState(false);
 
-  // Báo cáo hiển thị tất cả các lớp (không lọc theo năm học vì màn này không có bộ chọn năm học)
-  const yearClasses = classesList;
+  // Chỉ lấy lớp của đúng năm học đang chọn (đồng bộ với bộ chọn năm học ở sidebar), và sắp
+  // xếp theo khối rồi tên lớp — trước đây lấy nguyên classesList (mọi năm học, không sắp xếp)
+  // nên bị lẫn lớp của năm học khác và thứ tự lộn xộn theo ngày tạo.
+  const yearClasses = useMemo(() => {
+    const filtered = selectedYear ? classesList.filter((c) => c.year === selectedYear) : classesList;
+    const getGradeNum = (c: ClassItem) => parseInt(String(c.grade).replace(/[^0-9]/g, ''), 10) || 0;
+    return [...filtered].sort((a, b) => {
+      const gradeDiff = getGradeNum(a) - getGradeNum(b);
+      if (gradeDiff !== 0) return gradeDiff;
+      return a.name.localeCompare(b.name, 'vi', { numeric: true });
+    });
+  }, [classesList, selectedYear]);
 
   // Tải điểm từ Supabase scoresService khi chọn lớp
   useEffect(() => {
@@ -223,7 +234,7 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
     const classIds =
       selectedClassId !== 'all'
         ? [selectedClassId]
-        : (yearClasses.length > 0 ? yearClasses : classesList).map((c) => c.id);
+        : (yearClasses).map((c) => c.id);
 
     if (classIds.length === 0) {
       setAttendanceSummary({});
@@ -418,7 +429,7 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
     const result: Record<string, { rank: 'T' | 'H'; comment: string }> = {};
     const classesToProcess =
       selectedClassId === 'all'
-        ? (yearClasses.length > 0 ? yearClasses : classesList)
+        ? (yearClasses)
         : currentSelectedClass
         ? [currentSelectedClass]
         : [];
@@ -504,7 +515,7 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
 
     if (selectedClassId === 'all') {
       // Khi chọn Tất cả các lớp: Mỗi lớp xuất ra 1 sheet riêng biệt
-      const classesToExport = yearClasses.length > 0 ? yearClasses : classesList;
+      const classesToExport = yearClasses;
 
       for (const cls of classesToExport) {
         const rawClassStudents = studentsList.filter((s) => s.classId === cls.id);
@@ -614,7 +625,7 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
     try {
       const classesToExport =
         selectedClassId === 'all'
-          ? (yearClasses.length > 0 ? yearClasses : classesList)
+          ? (yearClasses)
           : currentSelectedClass
           ? [currentSelectedClass]
           : [];

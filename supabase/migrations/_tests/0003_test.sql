@@ -16,28 +16,29 @@ begin
     values (v_class_id, 'HS_TEST', 'Tran Van Test')
     returning id into v_student_id;
 
-    -- 1. Test scores voi T: theory=9, practice=10 -> total=9.5, classification='T'
+    -- 1. Test scores voi T: theory=4.5, practice=4.5 -> total=9 (cong thang, khong chia 2),
+    -- classification='T' (moi diem thanh phan toi da 5, nen Tong toi da la 10)
     insert into public.scores (student_id, semester, theory_score, practice_score)
-    values (v_student_id, 'hk1', 9.0, 10.0);
+    values (v_student_id, 'hk1', 4.5, 4.5);
 
     select total_score, classification into v_rec
     from public.scores
     where student_id = v_student_id and semester = 'hk1';
 
-    assert v_rec.total_score = 9.5 and v_rec.classification = 'T',
-        format('Test HK1 that bai: expected total=9.5, classification=T, got total=%s, class=%s', v_rec.total_score, v_rec.classification);
+    assert v_rec.total_score = 9 and v_rec.classification = 'T',
+        format('Test HK1 that bai: expected total=9, classification=T, got total=%s, class=%s', v_rec.total_score, v_rec.classification);
 
-    -- 2. Test scores voi H: theory=6, practice=5 -> total=5.5, classification='H'
-    -- Su dung ca_nam
+    -- 2. Test lam tron .5 len: theory=2.3, practice=2.2 -> tong tho = 4.5 -> lam tron len thanh
+    -- 5 (khong lam tron xuong 4), classification='H'. Su dung ca_nam.
     insert into public.scores (student_id, semester, theory_score, practice_score)
-    values (v_student_id, 'ca_nam', 6.0, 5.0);
+    values (v_student_id, 'ca_nam', 2.3, 2.2);
 
     select total_score, classification into v_rec
     from public.scores
     where student_id = v_student_id and semester = 'ca_nam';
 
-    assert v_rec.total_score = 5.5 and v_rec.classification = 'H',
-        format('Test ca_nam that bai: expected total=5.5, classification=H, got total=%s, class=%s', v_rec.total_score, v_rec.classification);
+    assert v_rec.total_score = 5 and v_rec.classification = 'H',
+        format('Test ca_nam that bai (lam tron .5 len): expected total=5, classification=H, got total=%s, class=%s', v_rec.total_score, v_rec.classification);
 
     -- 3. Test duplicate (student_id, semester) -> phai loi unique_violation
     begin

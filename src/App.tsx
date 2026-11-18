@@ -548,7 +548,7 @@ export default function App() {
             )}
 
             {activeTab === 'reports' && (
-              <ReportsSection isAdmin={isAdmin} currentUser={currentUser} />
+              <ReportsSection isAdmin={isAdmin} currentUser={currentUser} selectedYear={selectedYear || undefined} />
             )}
 
             {activeTab === 'quiz' && (

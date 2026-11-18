@@ -16,7 +16,7 @@ import {
   ArrowRight,
   Check,
   X,
-  User,
+  AlertTriangle,
   GraduationCap,
   FileSpreadsheet,
   ExternalLink,
@@ -199,6 +199,10 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
   const handleStartExam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentName.trim()) return;
+    if (rosterStudents.length === 0) {
+      alert('Lớp này chưa có danh sách học sinh nên chưa thể làm bài. Em báo Thầy/Cô thêm danh sách lớp trước nhé!');
+      return;
+    }
 
     try {
       const { sessionId, questions } = await startExamSession(
@@ -650,19 +654,10 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                     </select>
                   </div>
                 ) : (
-                  <div className="relative">
-                    <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      value={studentName}
-                      onChange={(e) => setStudentName(e.target.value)}
-                      placeholder="Ví dụ: Nguyễn An Khang"
-                      className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-sky-500"
-                      required
-                      autoFocus
-                    />
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Lớp chưa có danh sách học sinh nên em tự nhập tên nhé.
+                  <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500 mt-0.5" />
+                    <p>
+                      Lớp này chưa có danh sách học sinh nên chưa thể làm bài. Em báo Thầy/Cô thêm danh sách lớp trước nhé!
                     </p>
                   </div>
                 )}
@@ -685,7 +680,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={!studentName.trim()}
+                  disabled={!studentName.trim() || rosterStudents.length === 0}
                   className="flex-1 py-2.5 bg-[#ea580c] hover:bg-[#c2410c] disabled:opacity-40 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <span>Vào thi ngay</span>
