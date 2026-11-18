@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { Link2, AlertCircle, Check, Loader2, Upload, Image as ImageIcon } from 'lucide-react';
-import { createResource } from '../../services/resourcesService';
+import { createResource, updateResource } from '../../services/resourcesService';
 import { uploadQuestionImage } from '../../services/quizImageService';
+import { Resource } from '../../types';
 
 interface SaveLinkFormProps {
   type: 'video' | 'link';
   grade?: number;
   onSaved?: () => void;
   onCancel?: () => void;
+  editing?: Resource | null;
+  showGrade?: boolean;
 }
 
 export const SaveLinkForm: React.FC<SaveLinkFormProps> = ({
@@ -15,15 +18,19 @@ export const SaveLinkForm: React.FC<SaveLinkFormProps> = ({
   grade = 1,
   onSaved,
   onCancel,
+  editing = null,
+  showGrade = type === 'video',
 }) => {
-  const [title, setTitle] = useState('');
-  const [url, setUrl] = useState('');
-  const [selectedGrade, setSelectedGrade] = useState<number>(grade);
-  const [thumbnailUrl, setThumbnailUrl] = useState('');
+  const [title, setTitle] = useState(editing?.title || '');
+  const [url, setUrl] = useState(editing?.url || '');
+  const [selectedGrade, setSelectedGrade] = useState<number>(editing?.grade || grade);
+  const [thumbnailUrl, setThumbnailUrl] = useState(editing?.thumbnailUrl || '');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(editing?.thumbnailUrl || null);
   const [errorMsg, setErrorMsg] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const isEditing = !!editing;
+  const showGradeField = showGrade;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -63,14 +70,23 @@ export const SaveLinkForm: React.FC<SaveLinkFormProps> = ({
         finalThumb = uploadRes.url;
       }
 
-      await createResource({
-        type,
-        title: title.trim(),
-        url: url.trim(),
-        grade: selectedGrade,
-        thumbnailUrl: finalThumb || undefined,
-        isActive: true,
-      });
+      if (isEditing && editing) {
+        await updateResource(editing.id, {
+          title: title.trim(),
+          url: url.trim(),
+          grade: showGradeField ? selectedGrade : undefined,
+          thumbnailUrl: finalThumb || undefined,
+        });
+      } else {
+        await createResource({
+          type,
+          title: title.trim(),
+          url: url.trim(),
+          grade: showGradeField ? selectedGrade : undefined,
+          thumbnailUrl: finalThumb || undefined,
+          isActive: true,
+        });
+      }
 
       setTitle('');
       setUrl('');
@@ -89,11 +105,14 @@ export const SaveLinkForm: React.FC<SaveLinkFormProps> = ({
     <form onSubmit={handleSubmit} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
       <div className="flex items-center gap-2 text-slate-800 font-bold text-xs pb-1">
         <Link2 className="w-4 h-4 text-emerald-600" />
-        <span>Lưu liên kết trang web {type === 'video' ? 'bài giảng' : 'tiện ích / tài liệu'}</span>
+        <span>
+          {isEditing ? 'Sửa liên kết trang web' : 'Lưu liên kết trang web'}{' '}
+          {type === 'video' ? 'bài giảng' : 'tiện ích / tài liệu'}
+        </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="sm:col-span-2">
+      <div className={`grid grid-cols-1 gap-3 ${showGradeField ? 'sm:grid-cols-3' : ''}`}>
+        <div className={showGradeField ? 'sm:col-span-2' : ''}>
           <label className="block text-[11px] font-bold text-slate-600 mb-1">
             Tiêu đề liên kết
           </label>
@@ -107,20 +126,22 @@ export const SaveLinkForm: React.FC<SaveLinkFormProps> = ({
           />
         </div>
 
-        <div>
-          <label className="block text-[11px] font-bold text-slate-600 mb-1">Khối lớp</label>
-          <select
-            value={selectedGrade}
-            onChange={(e) => setSelectedGrade(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium focus:outline-emerald-500"
-          >
-            {[1, 2, 3, 4, 5].map((g) => (
-              <option key={g} value={g}>
-                Khối {g}
-              </option>
-            ))}
-          </select>
-        </div>
+        {showGradeField && (
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 mb-1">Khối lớp</label>
+            <select
+              value={selectedGrade}
+              onChange={(e) => setSelectedGrade(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium focus:outline-emerald-500"
+            >
+              {[1, 2, 3, 4, 5].map((g) => (
+                <option key={g} value={g}>
+                  Khối {g}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div>
@@ -208,7 +229,7 @@ export const SaveLinkForm: React.FC<SaveLinkFormProps> = ({
           ) : (
             <Check className="w-3.5 h-3.5" />
           )}
-          <span>{isSaving ? 'Đang lưu...' : 'Lưu liên kết'}</span>
+          <span>{isSaving ? 'Đang lưu...' : isEditing ? 'Cập nhật liên kết' : 'Lưu liên kết'}</span>
         </button>
       </div>
     </form>

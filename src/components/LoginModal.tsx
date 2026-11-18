@@ -34,7 +34,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      const emailToUse = username.includes('@') ? username.trim() : `${username.trim()}@qllh.pro`;
+      const emailToUse = username.includes('@')
+        ? username.trim()
+        : `${username.trim().toLowerCase()}@qllh.edu.vn`;
       const result = await signInStaff(emailToUse, password);
 
       if ('error' in result) {

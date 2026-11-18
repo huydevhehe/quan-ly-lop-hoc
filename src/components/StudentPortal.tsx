@@ -101,7 +101,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
 
   useEffect(() => {
     if (isResourcesListOpen) {
-      listResources('link', selectedGrade)
+      listResources('link')
         .then((data) => setActiveLinksList(data.filter((l) => l.isActive !== false)))
         .catch(() => {});
       listResources('video', selectedGrade)

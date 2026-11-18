@@ -154,6 +154,7 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
         <SaveLinkForm
           type="link"
           grade={selectedGrade === 'all' ? 1 : selectedGrade}
+          showGrade
           onSaved={() => {
             setShowSaveLinkForm(false);
             refreshResources();

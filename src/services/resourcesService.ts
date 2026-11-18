@@ -64,6 +64,32 @@ export async function createResource(input: Omit<Resource, 'id'>): Promise<strin
 }
 
 /**
+ * Cập nhật tài nguyên đã có (sửa tiêu đề, URL, khối lớp, ảnh thumbnail)
+ */
+export async function updateResource(
+  id: string,
+  input: Partial<Pick<Resource, 'title' | 'url' | 'grade' | 'thumbnailUrl'>>
+): Promise<void> {
+  const patch: Record<string, any> = {};
+  if (input.title !== undefined) patch.title = input.title.trim();
+  if (input.url !== undefined) {
+    const trimmedUrl = input.url.trim();
+    if (!/^https?:\/\//i.test(trimmedUrl)) {
+      throw new Error('URL không hợp lệ');
+    }
+    patch.url = trimmedUrl;
+  }
+  if (input.grade !== undefined) patch.grade = input.grade || null;
+  if (input.thumbnailUrl !== undefined) patch.thumbnail_url = input.thumbnailUrl?.trim() || null;
+
+  const { error } = await supabase.from('resources').update(patch).eq('id', id);
+
+  if (error) {
+    throw new Error(translateSupabaseError(error, 'Không thể cập nhật liên kết. Vui lòng thử lại.'));
+  }
+}
+
+/**
  * Bật / tắt kích hoạt tài nguyên
  */
 export async function setResourceActive(id: string, isActive: boolean): Promise<void> {

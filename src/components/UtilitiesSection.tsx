@@ -2,17 +2,16 @@ import React, { useState, useEffect } from 'react';
 import {
   Wrench,
   Clock,
-  Users2,
   Play,
   Pause,
   RotateCcw,
   Maximize2,
   Minimize2,
   Sparkles,
-  Shuffle,
   Link2,
   ExternalLink,
   Trash2,
+  Pencil,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Classroom, Student, UserAccount } from '../types';
@@ -20,7 +19,7 @@ import { soundManager } from '../utils/audio';
 import { StudentCommentsManager } from './StudentCommentsManager';
 import { Award } from 'lucide-react';
 import { SaveLinkForm } from './resources/SaveLinkForm';
-import { listResources, deleteResource } from '../services/resourcesService';
+import { listResources, deleteResource, updateResource } from '../services/resourcesService';
 import { Resource } from '../types';
 
 interface UtilitiesSectionProps {
@@ -40,10 +39,10 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
   isAdmin = true,
   currentUser,
 }) => {
-  const [activeTab, setActiveTab] = useState<'comments' | 'timer' | 'teams' | 'links'>(() => {
+  const [activeTab, setActiveTab] = useState<'comments' | 'timer' | 'links'>(() => {
     try {
       const saved = localStorage.getItem('qllh_utilities_subtab');
-      if (saved === 'comments' || saved === 'timer' || saved === 'teams' || saved === 'links') {
+      if (saved === 'comments' || saved === 'timer' || saved === 'links') {
         return saved;
       }
     } catch {}
@@ -51,6 +50,7 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
   });
 
   const [utilityLinks, setUtilityLinks] = useState<Resource[]>([]);
+  const [editingLink, setEditingLink] = useState<Resource | null>(null);
 
   const fetchUtilityLinks = async () => {
     try {
@@ -80,11 +80,6 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [customMinutes, setCustomMinutes] = useState(5);
 
-  // Group generator state
-  const [groupCount, setGroupCount] = useState(4);
-  const [generatedGroups, setGeneratedGroups] = useState<{ name: string; members: Student[] }[]>([]);
-
-
   // Luôn có 1 object hợp lệ để render, tránh crash trắng trang khi classrooms chưa tải
   // xong (vd vừa tải lại trang trong khi tab này đang mở) — classrooms rỗng thì [0] vẫn undefined.
   const currentClass = classrooms.find((c) => c.id === selectedClassId) || classrooms[0] || {
@@ -95,8 +90,6 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
     totalStudents: 0,
     roomCode: '',
   };
-  const classStudents = students.filter((s) => s.classId === selectedClassId);
-
   // Timer logic
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -134,42 +127,6 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
     setInitialSeconds(secs);
   };
 
-  // Group generator logic
-  const groupNames = [
-    '🦁 Nhóm Sư Tử Vàng',
-    '🐬 Nhóm Cá Heo Xanh',
-    '🦅 Nhóm Đại Bàng Lửa',
-    '🚀 Nhóm Tên Lửa Sáng Tạo',
-    '⭐ Nhóm Ngôi Sao Tri Thức',
-    '💎 Nhóm Kim Cương Đoàn Kết',
-  ];
-
-  const handleGenerateGroups = () => {
-    if (classStudents.length === 0) return;
-
-    soundManager.playFanfare();
-    const shuffled = [...classStudents].sort(() => Math.random() - 0.5);
-    const groups: { name: string; members: Student[] }[] = Array.from(
-      { length: groupCount },
-      (_, i) => ({
-        name: groupNames[i % groupNames.length],
-        members: [],
-      })
-    );
-
-    shuffled.forEach((student, index) => {
-      const groupIdx = index % groupCount;
-      groups[groupIdx].members.push(student);
-    });
-
-    setGeneratedGroups(groups);
-    confetti({
-      particleCount: 50,
-      spread: 60,
-      origin: { y: 0.6 },
-    });
-  };
-
   const formatTime = (totalSecs: number) => {
     const mins = Math.floor(totalSecs / 60);
     const secs = totalSecs % 60;
@@ -190,7 +147,7 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
           </div>
           <h2 className="text-2xl font-black text-slate-900 mt-1">Tiện ích giảng dạy</h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Thẻ nhận xét học sinh tự động (Excel), đồng hồ đếm ngược, bốc thăm chia nhóm và nhập học sinh
+            Thẻ nhận xét học sinh tự động (Excel), đồng hồ đếm ngược và liên kết tiện ích
           </p>
         </div>
 
@@ -222,17 +179,6 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
             <span>Đồng hồ đếm ngược</span>
           </button>
           <button
-            onClick={() => setActiveTab('teams')}
-            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'teams'
-                ? 'bg-white text-blue-600 shadow-sm ring-2 ring-blue-100'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-            }`}
-          >
-            <Users2 className="w-3.5 h-3.5" />
-            <span>Chia nhóm học tập</span>
-          </button>
-          <button
             onClick={() => setActiveTab('links')}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'links'
@@ -249,17 +195,17 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
       {/* TAB 1: COUNTDOWN TIMER */}
       {activeTab === 'timer' && (
         <div
-          className={`bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-2xs flex flex-col items-center transition-all ${
+          className={`relative overflow-hidden rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-2xs flex flex-col items-center transition-all bg-gradient-to-br from-indigo-50 via-fuchsia-50 to-amber-50 ${
             isFullscreen ? 'fixed inset-0 z-50 rounded-none border-none p-12 justify-center' : ''
           }`}
         >
           <div className="w-full flex items-center justify-between mb-4">
-            <span className="text-xs font-bold text-rose-600 uppercase tracking-wider">
+            <span className="text-xs font-black uppercase tracking-wider bg-gradient-to-r from-fuchsia-600 via-rose-500 to-amber-500 bg-clip-text text-transparent">
               ĐỒNG HỒ ĐẾM NGƯỢC LỚP HỌC
             </span>
             <button
               onClick={() => setIsFullscreen(!isFullscreen)}
-              className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors flex items-center gap-1.5 text-xs font-medium"
+              className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-white/70 transition-colors flex items-center gap-1.5 text-xs font-medium"
               title={isFullscreen ? 'Thu nhỏ' : 'Chiếu toàn màn hình lên máy chiếu'}
             >
               {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -270,11 +216,13 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
           {/* Time Display */}
           <div className="my-6 flex flex-col items-center">
             <div
-              className={`font-mono font-black tracking-tight select-none ${
-                isFullscreen
-                  ? 'text-7xl sm:text-9xl text-slate-900'
-                  : 'text-6xl sm:text-7xl text-slate-900'
-              } ${timerSeconds <= 10 && timerSeconds > 0 ? 'text-rose-600 animate-pulse' : ''}`}
+              className={`font-mono font-black tracking-tight select-none drop-shadow-sm ${
+                isFullscreen ? 'text-7xl sm:text-9xl' : 'text-6xl sm:text-7xl'
+              } ${
+                timerSeconds <= 10 && timerSeconds > 0
+                  ? 'text-rose-600 animate-pulse'
+                  : 'bg-gradient-to-r from-indigo-600 via-fuchsia-500 to-amber-500 bg-clip-text text-transparent'
+              }`}
             >
               {formatTime(timerSeconds)}
             </div>
@@ -292,8 +240,8 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
               onClick={() => setIsTimerRunning(!isTimerRunning)}
               className={`px-8 py-3.5 rounded-2xl text-white font-bold text-base shadow-md transition-all active:scale-95 flex items-center gap-2 cursor-pointer ${
                 isTimerRunning
-                  ? 'bg-amber-500 hover:bg-amber-600'
-                  : 'bg-rose-600 hover:bg-rose-700'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
+                  : 'bg-gradient-to-r from-fuchsia-600 to-rose-600 hover:from-fuchsia-700 hover:to-rose-700'
               }`}
             >
               {isTimerRunning ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 fill-white" />}
@@ -305,7 +253,7 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
                 setIsTimerRunning(false);
                 setTimerSeconds(initialSeconds);
               }}
-              className="p-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors shadow-2xs"
+              className="p-3.5 rounded-2xl bg-white/80 hover:bg-white text-slate-700 transition-colors shadow-2xs border border-slate-200"
               title="Đặt lại thời gian ban đầu"
             >
               <RotateCcw className="w-5 h-5" />
@@ -332,8 +280,8 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
                   onClick={() => handleSetTimer(p.val)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
                     initialSeconds === p.val && !isTimerRunning
-                      ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      ? 'bg-gradient-to-r from-fuchsia-500 to-amber-500 text-white shadow-sm'
+                      : 'bg-white/70 text-slate-600 hover:bg-white border border-slate-200'
                   }`}
                 >
                   {p.label}
@@ -357,93 +305,6 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
         </div>
       )}
 
-      {/* TAB 2: GROUP GENERATOR */}
-      {activeTab === 'teams' && (
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-2xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
-                BỐC THĂM CHIA NHÓM
-              </span>
-              <h3 className="text-xl font-bold text-slate-900 mt-1">
-                Chia nhóm học tập tự động cho {currentClass.name}
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Chia đều {classStudents.length} học sinh thành các nhóm thảo luận công bằng và ngẫu nhiên
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5 text-xs text-slate-600">
-                <span className="font-medium">Số nhóm:</span>
-                <select
-                  value={groupCount}
-                  onChange={(e) => setGroupCount(Number(e.target.value))}
-                  className="px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white font-bold text-slate-800"
-                >
-                  {[2, 3, 4, 5, 6].map((num) => (
-                    <option key={num} value={num}>
-                      {num} Nhóm
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <button
-                onClick={handleGenerateGroups}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-2"
-              >
-                <Shuffle className="w-4 h-4" />
-                <span>Bốc thăm chia nhóm</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Group display */}
-          {generatedGroups.length === 0 ? (
-            <div className="py-16 text-center border-2 border-dashed border-slate-200 rounded-2xl">
-              <Users2 className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-              <p className="text-xs text-slate-500">
-                Nhấn "Bốc thăm chia nhóm" để hệ thống chia học sinh lớp {currentClass.name} vào các nhóm.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {generatedGroups.map((group, gIdx) => (
-                <div
-                  key={gIdx}
-                  className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3"
-                >
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                    <h4 className="font-bold text-slate-800 text-sm">{group.name}</h4>
-                    <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                      {group.members.length} thành viên
-                    </span>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    {group.members.map((member, mIdx) => (
-                      <div
-                        key={member.id}
-                        className="bg-white px-3 py-2 rounded-xl border border-slate-100 flex items-center justify-between text-xs shadow-2xs"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-400 font-mono text-[11px] w-4">
-                            {mIdx + 1}.
-                          </span>
-                          <span className="font-semibold text-slate-800">{member.name}</span>
-                        </div>
-                        <span className="text-slate-400 text-[11px]">{member.code}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* TAB 4: STUDENT COMMENTS EXCEL MANAGER */}
       {activeTab === 'comments' && (
         <StudentCommentsManager currentUser={currentUser} />
@@ -453,9 +314,15 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
       {activeTab === 'links' && (
         <div className="space-y-5 animate-in fade-in duration-150">
           <SaveLinkForm
+            key={editingLink?.id || 'new'}
             type="link"
             grade={currentClass?.grade || 1}
-            onSaved={fetchUtilityLinks}
+            editing={editingLink}
+            onSaved={() => {
+              setEditingLink(null);
+              fetchUtilityLinks();
+            }}
+            onCancel={editingLink ? () => setEditingLink(null) : undefined}
           />
 
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-4">
@@ -494,9 +361,6 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
                           <ExternalLink className="w-6 h-6 text-indigo-400" />
                         </div>
                       )}
-                      <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-indigo-600/90 text-white text-[10px] font-bold">
-                        Khối {link.grade}
-                      </span>
                     </a>
 
                     <div className="p-4">
@@ -509,10 +373,18 @@ export const UtilitiesSection: React.FC<UtilitiesSectionProps> = ({
                     </div>
 
                     {isAdmin && (
-                      <div className="flex items-center justify-end px-4 pb-3 pt-1 border-t border-slate-100">
+                      <div className="flex items-center justify-end gap-3 px-4 pb-3 pt-1 border-t border-slate-100">
+                        <button
+                          onClick={() => setEditingLink(link)}
+                          className="text-[11px] font-bold text-indigo-500 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Sửa</span>
+                        </button>
                         <button
                           onClick={async () => {
                             if (confirm('Bạn chắc chắn muốn xóa liên kết này?')) {
+                              if (editingLink?.id === link.id) setEditingLink(null);
                               await deleteResource(link.id);
                               fetchUtilityLinks();
                             }
