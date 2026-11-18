@@ -39,14 +39,6 @@ import {
 import { getClassScores, saveScore } from '../services/scoresService';
 import { getClassWeekDates, saveClassWeekDates } from '../services/weekDatesService';
 import { getMyTimetable, saveMyTimetable } from '../services/timetableService';
-import { getAllCommentBanks } from '../services/commentBankService';
-import {
-  getAttendanceSummaryForClasses,
-  getWeekRangeForTerm,
-  pickCommentBank,
-  resolveClassGrade,
-  resolveClassification,
-} from '../services/reportsExportService';
 import { RandomPickerModal } from './RandomPickerModal';
 
 export interface ClassItem {
@@ -1192,7 +1184,16 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     XLSX.writeFile(workbook, fileName);
   };
 
-  // Action: Export full class roster with attendance summary + per-student comment columns
+  // Action: Export per-week attendance + nhận xét report (1 sheet "Tổng hợp" gộp tất cả các
+  // tuần đã có dữ liệu + 1 sheet riêng cho mỗi tuần từ 1 đến tuần hiện tại) — đúng theo mẫu
+  // báo cáo thật giáo viên đang dùng (Lớp/Năm học/Tuần/Từ ngày/Đến ngày + bảng STT/Mã HS/
+  // Họ và tên/Điểm danh/Đánh giá/Nhận xét), không phải nhận xét mẫu theo xếp loại điểm.
+  const ATTENDANCE_STATUS_LABEL: Record<string, string> = {
+    present: 'Có mặt',
+    excused: 'Vắng',
+    unexcused: 'Vắng',
+  };
+
   const handleExportStudentCommentsExcel = async () => {
     if (!currentClassId || classStudents.length === 0) {
       alert('Lớp chưa có học sinh để xuất file!');
@@ -1200,65 +1201,85 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     }
     setIsExportingComments(true);
     try {
-      const grade = resolveClassGrade(currentClass?.grade, currentClass?.name || '');
-      const { start, end } = getWeekRangeForTerm(currentTerm);
-      const [banksT, banksH, attendanceSummary] = await Promise.all([
-        getAllCommentBanks('T'),
-        getAllCommentBanks('H'),
-        getAttendanceSummaryForClasses([currentClassId], start, end),
-      ]);
-      const commentsT = pickCommentBank(grade, 'T', { T: banksT, H: banksH });
-      const commentsH = pickCommentBank(grade, 'H', { T: banksT, H: banksH });
-      let idxT = 0;
-      let idxH = 0;
+      const lastWeek = Math.max(1, currentWeek || 1);
+      const weekNumbers = Array.from({ length: lastWeek }, (_, i) => i + 1);
 
-      const dataRows = sortedStudents.map((st, idx) => {
-        const key = `${st.id}_${currentTerm}`;
-        const rec = gradeData[key];
-        const classification = resolveClassification(rec?.rank, rec?.total);
-        let comment = '';
-        if (classification === 'T') {
-          comment = commentsT.length > 0 ? commentsT[idxT % commentsT.length] : '';
-          idxT++;
-        } else {
-          comment = commentsH.length > 0 ? commentsH[idxH % commentsH.length] : '';
-          idxH++;
-        }
-        const att = attendanceSummary[st.id] || { present: 0, excused: 0, unexcused: 0 };
-        return {
-          STT: idx + 1,
-          'Mã học sinh': st.code,
-          'Họ và tên': st.name,
-          'Ngày sinh': st.dob || '',
-          'Giới tính': st.gender || '',
-          'Có mặt': att.present,
-          'Vắng có phép': att.excused,
-          'Vắng không phép': att.unexcused,
-          'Xếp loại': classification,
-          'Nhận xét': comment,
-        };
+      const weeksRaw = await Promise.all(
+        weekNumbers.map((w) =>
+          Promise.all([getWeekAttendance(currentClassId, w), getWeekEvaluations(currentClassId, w)])
+        )
+      );
+
+      const students = sortedStudents;
+      const workbook = XLSX.utils.book_new();
+
+      // Gộp dữ liệu từng tuần theo học sinh, cho sheet Tổng hợp
+      const summaryAttendanceByStudent: Record<string, string[]> = {};
+      const summaryNoteByStudent: Record<string, string[]> = {};
+      students.forEach((st) => {
+        summaryAttendanceByStudent[st.id] = [];
+        summaryNoteByStudent[st.id] = [];
       });
 
-      const worksheet = XLSX.utils.json_to_sheet(dataRows);
-      worksheet['!cols'] = [
-        { wch: 6 },
-        { wch: 14 },
-        { wch: 24 },
-        { wch: 13 },
-        { wch: 10 },
-        { wch: 10 },
-        { wch: 12 },
-        { wch: 14 },
-        { wch: 10 },
-        { wch: 60 },
+      weekNumbers.forEach((w, i) => {
+        const [attMap, evalMap] = weeksRaw[i];
+        const weekRec = weeksData[`${currentClassId}_${w}`];
+
+        const weekRows = students.map((st, idx) => {
+          const att = attMap[st.id];
+          const statusLabel = att ? ATTENDANCE_STATUS_LABEL[att.status] || '' : '';
+          const note = evalMap[st.id] || '';
+          if (statusLabel) summaryAttendanceByStudent[st.id].push(`Tuần ${w}: ${statusLabel}`);
+          if (note.trim()) summaryNoteByStudent[st.id].push(`Tuần ${w}: ${note.trim()}`);
+          return {
+            STT: idx + 1,
+            'Mã học sinh': st.code,
+            'Họ và tên': st.name,
+            'Điểm danh': statusLabel,
+            'Đánh giá': '',
+            'Nhận xét': note,
+          };
+        });
+
+        const weekSheetData: any[][] = [
+          ['Lớp', currentClass?.name || ''],
+          ['Năm học', currentYear || ''],
+          ['Tuần', `Tuần ${w}`],
+          ['Từ ngày', weekRec?.start || ''],
+          ['Đến ngày', weekRec?.end || ''],
+          ['STT', 'Mã học sinh', 'Họ và tên', 'Điểm danh', 'Đánh giá', 'Nhận xét'],
+          ...weekRows.map((r) => [r.STT, r['Mã học sinh'], r['Họ và tên'], r['Điểm danh'], r['Đánh giá'], r['Nhận xét']]),
+        ];
+        const weekSheet = XLSX.utils.aoa_to_sheet(weekSheetData);
+        weekSheet['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 24 }, { wch: 12 }, { wch: 10 }, { wch: 50 }];
+        XLSX.utils.book_append_sheet(workbook, weekSheet, `Tuan_${w}`);
+      });
+
+      const summaryRows = students.map((st, idx) => [
+        idx + 1,
+        st.code,
+        st.name,
+        summaryAttendanceByStudent[st.id].join('\n'),
+        '',
+        summaryNoteByStudent[st.id].join('\n'),
+      ]);
+      const summarySheetData: any[][] = [
+        ['Lớp', currentClass?.name || ''],
+        ['Năm học', currentYear || ''],
+        ['Tổng hợp đến', `Tuần ${lastWeek}`],
+        ['STT', 'Mã học sinh', 'Họ và tên', 'Điểm danh', 'Đánh giá', 'Nhận xét'],
+        ...summaryRows,
       ];
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Danh_gia_hoc_sinh');
-      const termLabel = currentTerm === 'hk1' ? 'HK1' : 'Ca_Nam';
-      const fileName = `Danh_Gia_${currentClass?.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'Lop'}_${termLabel}.xlsx`;
+      const summarySheet = XLSX.utils.aoa_to_sheet(summarySheetData);
+      summarySheet['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 24 }, { wch: 40 }, { wch: 10 }, { wch: 50 }];
+      // Chèn sheet Tổng hợp lên đầu danh sách sheet
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Tổng hợp');
+      workbook.SheetNames.unshift(workbook.SheetNames.pop() as string);
+
+      const fileName = `bao_cao_${(currentClass?.name || 'Lop').replace(/[\\/:*?"<>|]/g, '_')}_tuan_1_den_${lastWeek}.xlsx`;
       XLSX.writeFile(workbook, fileName);
     } catch (err: any) {
-      alert(`Không thể xuất file đánh giá: ${err.message || err}`);
+      alert(`Không thể xuất file báo cáo: ${err.message || err}`);
     } finally {
       setIsExportingComments(false);
     }
