@@ -373,6 +373,45 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
     return { present, excused, unexcused, absent: excused + unexcused };
   }, [filteredStudents, attendanceSummary]);
 
+  // Dữ liệu cho 2 biểu đồ (phân loại T/H/C/chưa có điểm, và phổ điểm + chuyên cần), cùng số
+  // liệu cảnh báo cho WarningBanner — tính từ đúng tập học sinh + khoảng tuần đang hiển thị.
+  const chartsData = useMemo(() => {
+    const classificationCounts = { T: 0, H: 0, C: 0, none: 0 };
+    const scoreBuckets = { '9-10': 0, '7-8': 0, '5-6': 0, 'duoi-5': 0 };
+    let needsAttentionCount = 0;
+
+    for (const st of filteredStudents) {
+      const key = `${st.id}_${selectedTerm}`;
+      const keyCode = st.code ? `${st.code}_${selectedTerm}` : '';
+      const rec = gradeData[key] || (keyCode ? gradeData[keyCode] : null);
+      const rank = (rec?.rank || '').trim().toUpperCase();
+
+      if (rank === 'T') classificationCounts.T++;
+      else if (rank === 'H') classificationCounts.H++;
+      else if (rank === 'C') classificationCounts.C++;
+      else classificationCounts.none++;
+
+      const total = rec?.total !== undefined && rec.total !== '' ? Number(rec.total) : NaN;
+      if (!isNaN(total)) {
+        if (total >= 9) scoreBuckets['9-10']++;
+        else if (total >= 7) scoreBuckets['7-8']++;
+        else if (total >= 5) scoreBuckets['5-6']++;
+        else scoreBuckets['duoi-5']++;
+      }
+
+      const unexcused = attendanceSummary[st.id]?.unexcused || 0;
+      if (unexcused > 2) needsAttentionCount++;
+    }
+
+    return {
+      classificationCounts,
+      scoreBuckets,
+      absenceBuckets: { '>2': needsAttentionCount },
+      missingScoreCount: classificationCounts.none,
+      needsAttentionCount,
+    };
+  }, [filteredStudents, gradeData, selectedTerm, attendanceSummary]);
+
   // Gán nhận xét T/H tự động cho từng học sinh (dùng chung logic rotation với "Xuất đánh giá
   // Excel" của StudentCommentsManager, để 2 nơi luôn cho ra kết quả nhận xét khớp nhau).
   const assignedComments = useMemo(() => {
@@ -881,6 +920,39 @@ export const ReportsSection: React.FC<ReportsSectionProps> = ({ isAdmin = true, 
               {stats.unranked} học sinh chưa xếp loại nên dùng nhận xét mặc định
             </p>
           </div>
+        </div>
+      </div>
+
+      <WarningBanner
+        missingScoreCount={chartsData.missingScoreCount}
+        needsAttentionCount={chartsData.needsAttentionCount}
+      />
+
+      {/* Charts Dashboard */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
+          <h3 className="text-sm font-bold text-slate-900 mb-1 flex items-center gap-2">
+            <Award className="w-4 h-4 text-[#0070f3]" />
+            <span>Tỉ lệ xếp loại</span>
+          </h3>
+          <p className="text-[11px] text-slate-500 font-semibold mb-2">
+            Phân bổ Hoàn thành Tốt / Hoàn thành / Chưa hoàn thành / Chưa có điểm
+          </p>
+          <ClassificationPieChart data={chartsData.classificationCounts} />
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
+          <h3 className="text-sm font-bold text-slate-900 mb-1 flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-[#0070f3]" />
+            <span>Phổ điểm & chuyên cần</span>
+          </h3>
+          <p className="text-[11px] text-slate-500 font-semibold mb-2">
+            Số học sinh theo mức điểm, và số em vắng không phép trên 2 buổi
+          </p>
+          <ScoreAttendanceBarChart
+            scoreBuckets={chartsData.scoreBuckets}
+            absenceBuckets={chartsData.absenceBuckets}
+          />
         </div>
       </div>
 
