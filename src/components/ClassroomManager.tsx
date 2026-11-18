@@ -469,6 +469,11 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   const [showImportExcelModal, setShowImportExcelModal] = useState(false);
   const [isExportingComments, setIsExportingComments] = useState(false);
   const excelFileInputRef = useRef<HTMLInputElement>(null);
+  // Debounce lưu điểm theo từng học sinh+học kỳ: mỗi lần gõ phím đều gọi saveScore ngay lập
+  // tức (không chờ) nên 2 request của 2 ký tự gõ liên tiếp chạy đua nhau trên mạng, request
+  // của ký tự gõ dở có thể về sau và đè mất giá trị gõ xong cuối cùng. Debounce lại để chỉ gửi
+  // đúng 1 request sau khi ngừng gõ ~600ms, tránh làm sai điểm đã lưu.
+  const gradeSaveTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Random picker modal state
   const [isLocalRandomPickerOpen, setIsLocalRandomPickerOpen] = useState(false);
@@ -1124,7 +1129,14 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       const thNum = thStr !== '' ? parseFloat(thStr) : null;
       if (ltNum !== null && thNum !== null && !isNaN(ltNum) && !isNaN(thNum)) {
         const semParam = currentTerm === 'hk1' ? 'hk1' : 'ca_nam';
-        saveScore(stId, semParam, ltNum, thNum).catch(() => {});
+        const timerKey = `${stId}_${semParam}`;
+        if (gradeSaveTimersRef.current[timerKey]) {
+          clearTimeout(gradeSaveTimersRef.current[timerKey]);
+        }
+        gradeSaveTimersRef.current[timerKey] = setTimeout(() => {
+          delete gradeSaveTimersRef.current[timerKey];
+          saveScore(stId, semParam, ltNum, thNum).catch(() => {});
+        }, 600);
       }
     }
   };
