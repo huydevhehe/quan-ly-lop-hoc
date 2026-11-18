@@ -93,6 +93,20 @@ export const adminService = {
     });
 
     if (error) {
+      // Supabase-js chỉ trả message chung "Edge Function returned a non-2xx
+      // status code" khi function trả lỗi; lý do thật nằm trong body response
+      // (error.context), nên phải tự đọc lại để báo đúng cho người dùng.
+      const context = (error as any).context;
+      if (context && typeof context.json === 'function') {
+        try {
+          const body = await context.json();
+          if (body?.error) {
+            return { error: body.error };
+          }
+        } catch {
+          // body không phải JSON hợp lệ, dùng message mặc định bên dưới
+        }
+      }
       return { error: error.message || 'Lỗi khi gọi tạo tài khoản' };
     }
 
