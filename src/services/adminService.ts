@@ -88,33 +88,47 @@ export const adminService = {
     fullName: string,
     role: 'admin' | 'teacher' = 'teacher'
   ): Promise<{ userId: string } | { error: string }> {
-    const { data, error } = await supabase.functions.invoke('create-staff-account', {
-      body: { email, password, fullName, role },
-    });
+    const attempt = async (): Promise<{ userId: string } | { error: string }> => {
+      const { data, error } = await supabase.functions.invoke('create-staff-account', {
+        body: { email, password, fullName, role },
+      });
 
-    if (error) {
-      // Supabase-js chỉ trả message chung "Edge Function returned a non-2xx
-      // status code" khi function trả lỗi; lý do thật nằm trong body response
-      // (error.context), nên phải tự đọc lại để báo đúng cho người dùng.
-      const context = (error as any).context;
-      if (context && typeof context.json === 'function') {
-        try {
-          const body = await context.json();
-          if (body?.error) {
-            return { error: body.error };
+      if (error) {
+        // Supabase-js chỉ trả message chung "Edge Function returned a non-2xx
+        // status code" khi function trả lỗi; lý do thật nằm trong body response
+        // (error.context), nên phải tự đọc lại để báo đúng cho người dùng.
+        const context = (error as any).context;
+        if (context && typeof context.json === 'function') {
+          try {
+            const body = await context.json();
+            if (body?.error) {
+              return { error: body.error };
+            }
+          } catch {
+            // body không phải JSON hợp lệ, dùng message mặc định bên dưới
           }
-        } catch {
-          // body không phải JSON hợp lệ, dùng message mặc định bên dưới
         }
+        return { error: error.message || 'Lỗi khi gọi tạo tài khoản' };
       }
-      return { error: error.message || 'Lỗi khi gọi tạo tài khoản' };
+
+      if (data?.error) {
+        return { error: data.error };
+      }
+
+      return { userId: data?.userId || '' };
+    };
+
+    const result = await attempt();
+
+    // "Database error creating new user" la loi thoang qua tu phia Supabase Auth
+    // (xac nhan qua thuc te: tai khoan van duoc tao thanh cong o lan goi dau du
+    // bao loi nay), nen tu dong thu lai 1 lan truoc khi bao that bai cho nguoi dung.
+    if ('error' in result && result.error.includes('Database error creating new user')) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      return attempt();
     }
 
-    if (data?.error) {
-      return { error: data.error };
-    }
-
-    return { userId: data?.userId || '' };
+    return result;
   },
 
   /**

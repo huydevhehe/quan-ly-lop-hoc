@@ -10,6 +10,7 @@ export interface Student {
   stars: number;
   speeches: number; // số lần phát biểu
   notes?: string;
+  orderIndex?: number;
 }
 
 export interface Classroom {

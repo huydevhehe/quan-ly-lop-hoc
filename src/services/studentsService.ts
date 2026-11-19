@@ -15,9 +15,9 @@ export interface StudentInput {
 export async function listStudentsByClass(classId: string): Promise<Student[]> {
   const { data, error } = await supabase
     .from('students')
-    .select('id, class_id, student_code, full_name, avatar, created_at')
+    .select('id, class_id, student_code, full_name, avatar, created_at, order_index')
     .eq('class_id', classId)
-    .order('student_code', { ascending: true });
+    .order('order_index', { ascending: true });
 
   if (error) {
     throw new Error(`Lỗi khi lấy danh sách học sinh: ${error.message}`);
@@ -34,6 +34,7 @@ export async function listStudentsByClass(classId: string): Promise<Student[]> {
     attendance: 'present',
     stars: 0,
     speeches: 0,
+    orderIndex: s.order_index ?? undefined,
   }));
 }
 
@@ -44,11 +45,23 @@ export async function listStudentsByClass(classId: string): Promise<Student[]> {
 export async function upsertStudents(classId: string, students: StudentInput[]): Promise<Student[]> {
   if (students.length === 0) return [];
 
-  const payload = students.map((s) => ({
+  // Tiep tuc danh so order_index tu vi tri lon nhat da co trong lop, giu dung
+  // thu tu cac dong trong file Excel import (khong sap xep lai theo ma hoc sinh).
+  const { data: maxRow } = await supabase
+    .from('students')
+    .select('order_index')
+    .eq('class_id', classId)
+    .order('order_index', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const startIndex = (maxRow?.order_index || 0) + 1;
+
+  const payload = students.map((s, idx) => ({
     class_id: classId,
     student_code: s.code.trim(),
     full_name: s.name.trim(),
     avatar: s.avatar || null,
+    order_index: startIndex + idx,
   }));
 
   const { data, error } = await supabase
@@ -60,18 +73,21 @@ export async function upsertStudents(classId: string, students: StudentInput[]):
     throw new Error(error.message);
   }
 
-  return (data || []).map((s: any) => ({
-    id: s.id,
-    classId: s.class_id,
-    code: s.student_code,
-    name: s.full_name,
-    gender: (s.gender as 'Nam' | 'Nữ') || 'Nam',
-    dob: s.dob || '2018-01-01',
-    avatar: s.avatar || '',
-    attendance: 'present',
-    stars: 0,
-    speeches: 0,
-  }));
+  return (data || [])
+    .map((s: any) => ({
+      id: s.id,
+      classId: s.class_id,
+      code: s.student_code,
+      name: s.full_name,
+      gender: (s.gender as 'Nam' | 'Nữ') || 'Nam',
+      dob: s.dob || '2018-01-01',
+      avatar: s.avatar || '',
+      attendance: 'present' as const,
+      stars: 0,
+      speeches: 0,
+      orderIndex: s.order_index ?? undefined,
+    }))
+    .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
 }
 
 /**

@@ -17,12 +17,19 @@ describe('studentsService', () => {
   });
 
   it('upsertStudents bao loi khi trung student_code trong cung lop', async () => {
-    const selectMock = vi.fn().mockResolvedValue({
+    const maybeSingleMock = vi.fn().mockResolvedValue({ data: null, error: null });
+    const limitMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
+    const orderForMaxMock = vi.fn().mockReturnValue({ limit: limitMock });
+    const eqForMaxMock = vi.fn().mockReturnValue({ order: orderForMaxMock });
+    const selectForMaxMock = vi.fn().mockReturnValue({ eq: eqForMaxMock });
+
+    const insertSelectMock = vi.fn().mockResolvedValue({
       data: null,
       error: { message: 'duplicate key value violates unique constraint "students_class_id_student_code_key"' },
     });
-    const insertMock = vi.fn().mockReturnValue({ select: selectMock });
-    (supabase.from as any).mockReturnValue({ insert: insertMock });
+    const insertMock = vi.fn().mockReturnValue({ select: insertSelectMock });
+
+    (supabase.from as any).mockReturnValue({ select: selectForMaxMock, insert: insertMock });
 
     await expect(
       upsertStudents('class-1', [

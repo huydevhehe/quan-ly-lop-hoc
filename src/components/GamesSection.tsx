@@ -188,7 +188,10 @@ export const GamesSection: React.FC = () => {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('🎯', centerX, centerY);
-  }, [rotationAngleRef.current, wheelItems]);
+    // activeGame: canvas bi unmount khi chuyen tab roi quay lai (chi render khi
+    // activeGame === 'wheel'), nen can ve lai moi khi tab nay duoc mo lai, khong
+    // chi khi wheelItems thay doi - neu khong canvas moi mount se bi trang.
+  }, [rotationAngleRef.current, wheelItems, activeGame]);
 
   const handleSpinWheel = () => {
     if (isSpinning) return;

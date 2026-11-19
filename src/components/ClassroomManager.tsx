@@ -280,7 +280,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
         attendance: s.attendance,
         stars: s.stars,
         speeches: s.speeches,
-        orderIndex: idx + 1,
+        orderIndex: s.orderIndex ?? idx + 1,
       }));
       setStudentsData(mapped);
     } catch (err) {

@@ -32,6 +32,15 @@ import { listMyClasses } from '../services/classesService';
 import { studentPermissionsService } from '../services/studentPermissionsService';
 import { soundManager } from '../utils/audio';
 
+// Tài khoản tạo bằng tên đăng nhập ngắn (không gõ email) được tự động ghép đuôi
+// "@qllh.edu.vn" phía sau để thỏa mãn Supabase Auth; ẩn đuôi giả này khi hiển thị
+// cho người dùng, chỉ giữ nguyên các email thật (gmail, v.v.) mà giáo viên tự gõ.
+const AUTO_EMAIL_SUFFIX = '@qllh.edu.vn';
+const displayUsername = (username: string): string =>
+  username.toLowerCase().endsWith(AUTO_EMAIL_SUFFIX)
+    ? username.slice(0, -AUTO_EMAIL_SUFFIX.length)
+    : username;
+
 interface AdminPanelProps {
   accounts: UserAccount[];
   setAccounts: React.Dispatch<React.SetStateAction<UserAccount[]>>;
@@ -177,7 +186,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleStartEditAccount = (acc: UserAccount) => {
     setEditingAccount(acc);
-    setEditUsername(acc.username);
+    setEditUsername(displayUsername(acc.username));
     setEditFullName(acc.fullName);
     setEditPassword('');
     setEditRole(acc.role);
@@ -217,7 +226,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     e.preventDefault();
     if (!newUsername.trim() || !newFullName.trim()) return;
 
-    if (accounts.some((a) => a.username.toLowerCase() === newUsername.trim().toLowerCase())) {
+    const email = newUsername.includes('@') ? newUsername.trim() : `${newUsername.trim().toLowerCase()}@qllh.edu.vn`;
+
+    if (accounts.some((a) => a.username.toLowerCase() === email.toLowerCase())) {
       alert('Tên đăng nhập này đã tồn tại! Vui lòng chọn tên khác.');
       return;
     }
@@ -227,8 +238,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       alert('Mật khẩu phải có ít nhất 6 ký tự!');
       return;
     }
-
-    const email = newUsername.includes('@') ? newUsername.trim() : `${newUsername.trim().toLowerCase()}@qllh.edu.vn`;
     const result = await adminService.createStaffAccount(email, pwd, newFullName.trim(), newRole === 'admin' ? 'admin' : 'teacher');
 
     if ('error' in result) {
@@ -545,7 +554,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   {accounts.map((acc) => (
                     <tr key={acc.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3.5 px-4 font-mono font-bold text-slate-800">
-                        {acc.username}
+                        {displayUsername(acc.username)}
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2">
