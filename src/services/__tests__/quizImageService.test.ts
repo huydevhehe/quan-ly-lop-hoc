@@ -18,14 +18,14 @@ describe('quizImageService', () => {
     vi.clearAllMocks();
   });
 
-  it('uploadQuestionImage tra loi khi file qua 2MB', async () => {
-    const bigFile = new File([new Uint8Array(3 * 1024 * 1024)], 'anh.png', {
+  it('uploadQuestionImage tra loi khi file qua 5MB', async () => {
+    const bigFile = new File([new Uint8Array(6 * 1024 * 1024)], 'anh.png', {
       type: 'image/png',
     });
     const result = await uploadQuestionImage(bigFile);
     expect('error' in result).toBe(true);
     if ('error' in result) {
-      expect(result.error).toContain('2MB');
+      expect(result.error).toContain('5MB');
     }
   });
 

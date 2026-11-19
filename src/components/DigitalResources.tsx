@@ -9,10 +9,12 @@ import {
   ExternalLink,
   BookOpen,
   X,
-  Share2
+  Share2,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { DigitalResource, Resource } from '../types';
-import { listResources, createResource, deleteResource } from '../services/resourcesService';
+import { listResources, createResource, updateResource, deleteResource } from '../services/resourcesService';
 import { SaveLinkForm } from './resources/SaveLinkForm';
 
 interface DigitalResourcesProps {
@@ -39,6 +41,8 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
   const [activeVideo, setActiveVideo] = useState<DigitalResource | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSaveLinkForm, setShowSaveLinkForm] = useState(false);
+  const [editingLink, setEditingLink] = useState<Resource | null>(null);
+  const [editingVideo, setEditingVideo] = useState<DigitalResource | null>(null);
 
   // New resource form state
   const [newTitle, setNewTitle] = useState('');
@@ -83,6 +87,7 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
   const handleDeleteLink = async (id: string) => {
     if (!confirm('Xóa liên kết này?')) return;
     try {
+      if (editingLink?.id === id) setEditingLink(null);
       await deleteResource(id);
       await refreshResources();
     } catch (err: any) {
@@ -95,20 +100,47 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
     if (!newTitle.trim()) return;
 
     try {
-      await createResource({
-        type: 'video',
-        grade: newGrade,
-        title: newTitle.trim(),
-        url: newVideoUrl.trim() || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-        thumbnailUrl: PLACEHOLDER_THUMBNAIL,
-        isActive: true,
-      });
+      if (editingVideo) {
+        await updateResource(editingVideo.id, {
+          grade: newGrade,
+          title: newTitle.trim(),
+          url: newVideoUrl.trim() || editingVideo.videoUrl,
+        });
+      } else {
+        await createResource({
+          type: 'video',
+          grade: newGrade,
+          title: newTitle.trim(),
+          url: newVideoUrl.trim() || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+          thumbnailUrl: PLACEHOLDER_THUMBNAIL,
+          isActive: true,
+        });
+      }
       await refreshResources();
       setShowAddModal(false);
+      setEditingVideo(null);
       setNewTitle('');
       setNewVideoUrl('');
     } catch (err: any) {
-      alert(`Không thể thêm học liệu: ${err.message || 'Lỗi không xác định'}`);
+      alert(`Không thể lưu học liệu: ${err.message || 'Lỗi không xác định'}`);
+    }
+  };
+
+  const handleStartEditVideo = (res: DigitalResource) => {
+    setEditingVideo(res);
+    setNewTitle(res.title);
+    setNewGrade(res.grade);
+    setNewVideoUrl(res.videoUrl || '');
+    setShowAddModal(true);
+  };
+
+  const handleDeleteVideo = async (id: string) => {
+    if (!confirm('Xóa video bài giảng này?')) return;
+    try {
+      await deleteResource(id);
+      await refreshResources();
+    } catch (err: any) {
+      alert(`Không thể xóa video: ${err.message || 'Lỗi không xác định'}`);
     }
   };
 
@@ -133,14 +165,23 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
         {isAdmin && (
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => setShowSaveLinkForm((prev) => !prev)}
+              onClick={() => {
+                setEditingLink(null);
+                setShowSaveLinkForm((prev) => !prev);
+              }}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold shadow-xs transition-colors shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>Lưu link website</span>
             </button>
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={() => {
+                setEditingVideo(null);
+                setNewTitle('');
+                setNewVideoUrl('');
+                setNewGrade(3);
+                setShowAddModal(true);
+              }}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors shrink-0"
             >
               <Plus className="w-4 h-4" />
@@ -150,16 +191,22 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
         )}
       </div>
 
-      {showSaveLinkForm && (
+      {(showSaveLinkForm || editingLink) && (
         <SaveLinkForm
+          key={editingLink?.id || 'new'}
           type="link"
           grade={selectedGrade === 'all' ? 1 : selectedGrade}
           showGrade
+          editing={editingLink}
           onSaved={() => {
             setShowSaveLinkForm(false);
+            setEditingLink(null);
             refreshResources();
           }}
-          onCancel={() => setShowSaveLinkForm(false)}
+          onCancel={() => {
+            setShowSaveLinkForm(false);
+            setEditingLink(null);
+          }}
         />
       )}
 
@@ -253,14 +300,27 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                     {isAdmin && (
-                      <button
-                        onClick={() => handleDeleteLink(link.id)}
-                        className="text-slate-400 hover:text-rose-600 font-bold flex items-center gap-1 cursor-pointer"
-                        title="Xóa liên kết"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        <span>Xóa</span>
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => {
+                            setShowSaveLinkForm(false);
+                            setEditingLink(link);
+                          }}
+                          className="text-indigo-500 hover:text-indigo-700 font-bold flex items-center gap-1 cursor-pointer"
+                          title="Sửa liên kết"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Sửa</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteLink(link.id)}
+                          className="text-slate-400 hover:text-rose-600 font-bold flex items-center gap-1 cursor-pointer"
+                          title="Xóa liên kết"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span>Xóa</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -311,7 +371,7 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
             </div>
 
             {/* Bottom Meta */}
-            <div className="px-4 py-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-end text-xs text-slate-500">
+            <div className="px-4 py-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
               <button
                 onClick={() => setActiveVideo(res)}
                 className="text-purple-600 hover:text-purple-700 font-semibold flex items-center gap-1"
@@ -319,6 +379,26 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
                 <span>Xem bài giảng</span>
                 <Play className="w-3 h-3 fill-purple-600" />
               </button>
+              {isAdmin && (
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => handleStartEditVideo(res)}
+                    className="text-indigo-500 hover:text-indigo-700 font-bold flex items-center gap-1 cursor-pointer"
+                    title="Sửa video bài giảng"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span>Sửa</span>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteVideo(res.id)}
+                    className="text-slate-400 hover:text-rose-600 font-bold flex items-center gap-1 cursor-pointer"
+                    title="Xóa video bài giảng"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Xóa</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -380,7 +460,9 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-6 space-y-4">
-            <h3 className="font-bold text-slate-800 text-base">Thêm video bài giảng mới</h3>
+            <h3 className="font-bold text-slate-800 text-base">
+              {editingVideo ? 'Sửa video bài giảng' : 'Thêm video bài giảng mới'}
+            </h3>
             <form onSubmit={handleAddResource} className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Tên bài giảng</label>
@@ -423,7 +505,10 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setEditingVideo(null);
+                  }}
                   className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg"
                 >
                   Hủy
@@ -432,7 +517,7 @@ export const DigitalResources: React.FC<DigitalResourcesProps> = ({ isAdmin = tr
                   type="submit"
                   className="px-4 py-1.5 text-xs font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                 >
-                  Lưu học liệu
+                  {editingVideo ? 'Cập nhật học liệu' : 'Lưu học liệu'}
                 </button>
               </div>
             </form>
