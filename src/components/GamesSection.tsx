@@ -30,6 +30,7 @@ export const GamesSection: React.FC = () => {
   const [activeGame, setActiveGame] = useState<'wheel' | 'mysteryBox' | 'brainBreak' | 'cards'>('wheel');
   const [customGames, setCustomGames] = useState<Resource[]>([]);
   const [showAddGameModal, setShowAddGameModal] = useState(false);
+  const [editingGame, setEditingGame] = useState<Resource | null>(null);
 
   const fetchCustomGames = async () => {
     try {
@@ -643,7 +644,10 @@ export const GamesSection: React.FC = () => {
             </div>
 
             <button
-              onClick={() => setShowAddGameModal((prev) => !prev)}
+              onClick={() => {
+                setEditingGame(null);
+                setShowAddGameModal((prev) => !prev);
+              }}
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors shrink-0 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
@@ -651,13 +655,19 @@ export const GamesSection: React.FC = () => {
             </button>
           </div>
 
-          {showAddGameModal && (
+          {(showAddGameModal || editingGame) && (
             <GameCardForm
+              key={editingGame?.id || 'new'}
+              editing={editingGame}
               onSaved={() => {
                 setShowAddGameModal(false);
+                setEditingGame(null);
                 fetchCustomGames();
               }}
-              onCancel={() => setShowAddGameModal(false)}
+              onCancel={() => {
+                setShowAddGameModal(false);
+                setEditingGame(null);
+              }}
             />
           )}
 
@@ -747,9 +757,21 @@ export const GamesSection: React.FC = () => {
                       </a>
 
                       <button
+                        onClick={() => {
+                          setEditingGame(game);
+                          setShowAddGameModal(false);
+                        }}
+                        className="p-1.5 rounded-xl bg-white border border-slate-200 text-amber-600 hover:bg-amber-50 transition-colors cursor-pointer"
+                        title="Sửa thẻ game"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
                         onClick={async () => {
                           if (confirm(`Bạn có chắc muốn xóa thẻ game "${game.title}"?`)) {
                             try {
+                              if (editingGame?.id === game.id) setEditingGame(null);
                               await deleteResource(game.id);
                               fetchCustomGames();
                             } catch (err: any) {

@@ -1,22 +1,25 @@
 import React, { useState } from 'react';
 import { Gamepad2, Image as ImageIcon, AlertTriangle, AlertCircle, Check, Loader2, Upload } from 'lucide-react';
-import { createResource } from '../../services/resourcesService';
+import { createResource, updateResource } from '../../services/resourcesService';
 import { uploadQuestionImage } from '../../services/quizImageService';
+import { Resource } from '../../types';
 
 interface GameCardFormProps {
   onSaved?: () => void;
   onCancel?: () => void;
+  editing?: Resource | null;
 }
 
-export const GameCardForm: React.FC<GameCardFormProps> = ({ onSaved, onCancel }) => {
-  const [title, setTitle] = useState('');
-  const [url, setUrl] = useState('');
-  const [thumbnailUrl, setThumbnailUrl] = useState('');
+export const GameCardForm: React.FC<GameCardFormProps> = ({ onSaved, onCancel, editing = null }) => {
+  const [title, setTitle] = useState(editing?.title || '');
+  const [url, setUrl] = useState(editing?.url || '');
+  const [thumbnailUrl, setThumbnailUrl] = useState(editing?.thumbnailUrl || '');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(editing?.thumbnailUrl || null);
   const [aspectWarning, setAspectWarning] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isEditing = !!editing;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -74,14 +77,22 @@ export const GameCardForm: React.FC<GameCardFormProps> = ({ onSaved, onCancel })
         finalThumb = 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80';
       }
 
-      // Lưu vào Supabase resources với type: 'game', mặc định isActive: false
-      await createResource({
-        type: 'game',
-        title: title.trim(),
-        url: url.trim(),
-        thumbnailUrl: finalThumb,
-        isActive: false,
-      });
+      if (isEditing && editing) {
+        await updateResource(editing.id, {
+          title: title.trim(),
+          url: url.trim(),
+          thumbnailUrl: finalThumb,
+        });
+      } else {
+        // Lưu vào Supabase resources với type: 'game', mặc định isActive: false
+        await createResource({
+          type: 'game',
+          title: title.trim(),
+          url: url.trim(),
+          thumbnailUrl: finalThumb,
+          isActive: false,
+        });
+      }
 
       if (onSaved) onSaved();
     } catch (err: any) {
@@ -98,9 +109,13 @@ export const GameCardForm: React.FC<GameCardFormProps> = ({ onSaved, onCancel })
           <Gamepad2 className="w-4 h-4" />
         </div>
         <div>
-          <h4 className="font-bold text-slate-900 text-xs">Thêm trò chơi giáo dục mới</h4>
+          <h4 className="font-bold text-slate-900 text-xs">
+            {isEditing ? 'Sửa trò chơi giáo dục' : 'Thêm trò chơi giáo dục mới'}
+          </h4>
           <p className="text-[11px] text-slate-500 font-normal">
-            Thẻ game sau khi thêm sẽ ở trạng thái chờ, bạn có thể bấm kích hoạt để học sinh chơi
+            {isEditing
+              ? 'Cập nhật tên, liên kết hoặc ảnh nền của thẻ game này'
+              : 'Thẻ game sau khi thêm sẽ ở trạng thái chờ, bạn có thể bấm kích hoạt để học sinh chơi'}
           </p>
         </div>
       </div>
@@ -208,7 +223,7 @@ export const GameCardForm: React.FC<GameCardFormProps> = ({ onSaved, onCancel })
           ) : (
             <Check className="w-4 h-4" />
           )}
-          <span>{isSubmitting ? 'Đang lưu game...' : 'Tạo thẻ game'}</span>
+          <span>{isSubmitting ? 'Đang lưu...' : isEditing ? 'Cập nhật thẻ game' : 'Tạo thẻ game'}</span>
         </button>
       </div>
     </form>

@@ -104,7 +104,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     {
       id: 'utilities',
       title: 'Tiện ích',
-      description: 'Thẻ nhận xét học sinh tự động (Excel), đếm ngược thời gian, chia nhóm...',
+      description: 'Thẻ nhận xét học sinh tự động (Excel), đếm ngược thời gian, liên kết tiện ích...',
       icon: <Wrench className="w-6 h-6 text-white" />,
       colorBg: 'bg-[#f43f5e]',
       iconColor: 'text-[#f43f5e]',

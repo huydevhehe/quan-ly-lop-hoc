@@ -477,10 +477,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-800 text-sm">
-                    Tiện ích giảng dạy (Đồng hồ chiếu bảng & Chia nhóm)
+                    Tiện ích giảng dạy (Đồng hồ chiếu bảng & Liên kết tiện ích)
                   </h4>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Cho phép giáo viên sử dụng tiện ích đồng hồ đếm ngược chiếu bảng, bộ chia nhóm ngẫu nhiên và bốc thăm học sinh.
+                    Cho phép giáo viên sử dụng tiện ích đồng hồ đếm ngược chiếu bảng và lưu liên kết trang web tiện ích/tài liệu.
                   </p>
                 </div>
               </div>
