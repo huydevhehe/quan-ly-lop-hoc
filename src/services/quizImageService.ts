@@ -4,12 +4,7 @@ import { translateSupabaseError } from '../utils/errorMessages';
 export async function uploadQuestionImage(
   file: File
 ): Promise<{ url: string } | { error: string }> {
-  // 1. Kiểm tra kích thước file (tối đa 5MB)
-  if (file.size > 5 * 1024 * 1024) {
-    return { error: 'Kích thước ảnh không được vượt quá 5MB' };
-  }
-
-  // 2. Kiểm tra định dạng (chỉ chấp nhận JPEG / PNG)
+  // Kiểm tra định dạng (chỉ chấp nhận JPEG / PNG)
   if (file.type !== 'image/jpeg' && file.type !== 'image/png') {
     return { error: 'Định dạng ảnh không hợp lệ (chỉ chấp nhận JPG hoặc PNG)' };
   }
