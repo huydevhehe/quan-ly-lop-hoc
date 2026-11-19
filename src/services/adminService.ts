@@ -8,7 +8,7 @@ export const adminService = {
   async listStaff(): Promise<UserAccount[]> {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, full_name, role, avatar, status, created_at')
+      .select('id, email, full_name, role, avatar, status, created_at, school_id')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -23,16 +23,21 @@ export const adminService = {
       status: p.status === 'locked' ? 'locked' : 'active',
       avatar: p.avatar || undefined,
       createdAt: p.created_at || new Date().toISOString(),
+      schoolId: p.school_id || undefined,
     }));
   },
 
   /**
    * Cập nhật họ tên / vai trò của tài khoản (ghi thật vào bảng profiles)
    */
-  async updateStaffProfile(id: string, patch: { fullName?: string; role?: 'admin' | 'teacher' }): Promise<void> {
+  async updateStaffProfile(
+    id: string,
+    patch: { fullName?: string; role?: 'admin' | 'teacher'; schoolId?: string | null }
+  ): Promise<void> {
     const updatePayload: Record<string, any> = {};
     if (patch.fullName !== undefined) updatePayload.full_name = patch.fullName.trim();
     if (patch.role !== undefined) updatePayload.role = patch.role;
+    if (patch.schoolId !== undefined) updatePayload.school_id = patch.schoolId;
 
     const { error } = await supabase.from('profiles').update(updatePayload).eq('id', id);
     if (error) {
@@ -86,11 +91,12 @@ export const adminService = {
     email: string,
     password: string,
     fullName: string,
-    role: 'admin' | 'teacher' = 'teacher'
+    role: 'admin' | 'teacher' = 'teacher',
+    schoolId?: string
   ): Promise<{ userId: string } | { error: string }> {
     const attempt = async (): Promise<{ userId: string } | { error: string }> => {
       const { data, error } = await supabase.functions.invoke('create-staff-account', {
-        body: { email, password, fullName, role },
+        body: { email, password, fullName, role, schoolId },
       });
 
       if (error) {

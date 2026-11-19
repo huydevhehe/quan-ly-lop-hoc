@@ -30,6 +30,8 @@ import { Student, UserAccount } from '../types';
 import { listMyClasses, createClass, updateClass, deleteClass } from '../services/classesService';
 import { listStudentsByClass, upsertStudents, deleteStudent } from '../services/studentsService';
 import { listSchoolYears, createSchoolYear } from '../services/schoolYearsService';
+import { listSchools } from '../services/schoolsService';
+import { School } from '../types';
 import {
   getWeekAttendance,
   saveWeekAttendance,
@@ -452,6 +454,14 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
   const [classFormName, setClassFormName] = useState('');
   const [classFormGrade, setClassFormGrade] = useState('1');
+  const [classFormSchoolId, setClassFormSchoolId] = useState('');
+  const [schoolsList, setSchoolsList] = useState<School[]>([]);
+
+  useEffect(() => {
+    listSchools()
+      .then(setSchoolsList)
+      .catch(() => {});
+  }, []);
   const [classFormYear, setClassFormYear] = useState('');
 
   const [showStudentModal, setShowStudentModal] = useState(false);
@@ -865,6 +875,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     setClassFormName('');
     setClassFormGrade('1');
     setClassFormYear(currentYear);
+    setClassFormSchoolId(schoolsList[0]?.id || '');
     setShowClassModal(true);
   };
 
@@ -924,6 +935,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
           grade: Number(gradeVal),
           schoolYearId,
           schoolYearName: classFormYear,
+          schoolId: classFormSchoolId || undefined,
         });
         await fetchClasses();
         setCurrentClassId(newClass.id);
@@ -2819,6 +2831,23 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                   <option value="5">Khối 5</option>
                 </select>
               </div>
+              {isRealAdmin && !isEditingClass && schoolsList.length > 1 && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Thuộc trường *</label>
+                  <select
+                    value={classFormSchoolId}
+                    onChange={(e) => setClassFormSchoolId(e.target.value)}
+                    className="w-full border border-slate-300 bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-[#0070f3] text-sm font-bold text-slate-900 cursor-pointer"
+                    required
+                  >
+                    {schoolsList.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="flex justify-between items-center mt-8 pt-4 border-t border-slate-100">
                 {isEditingClass && (editingClassId || currentClassId) ? (
                   <button

@@ -4,6 +4,7 @@ vi.mock('../../lib/supabaseClient', () => {
   return {
     supabase: {
       from: vi.fn(),
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
     },
   };
 });
@@ -63,6 +64,7 @@ describe('classesService', () => {
       name: 'Lớp 4B',
       grade: 4,
       schoolYearId: 'sy1',
+      schoolId: 'school-1',
     });
 
     expect(newClass.id).toBe('c2');

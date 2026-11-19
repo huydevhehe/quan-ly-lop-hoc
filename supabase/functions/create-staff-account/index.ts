@@ -58,7 +58,7 @@ Deno.serve(async (req: Request) => {
 
     // 3. Đọc dữ liệu body
     const body = await req.json();
-    const { email, password, fullName, role = "teacher" } = body;
+    const { email, password, fullName, role = "teacher", schoolId } = body;
 
     if (!email || !password || !fullName) {
       return new Response(
@@ -97,6 +97,7 @@ Deno.serve(async (req: Request) => {
       email: email.trim(),
       full_name: fullName.trim(),
       role: role,
+      school_id: role === "teacher" ? schoolId || null : null,
     });
 
     if (insertProfError) {

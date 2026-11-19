@@ -4,6 +4,7 @@ vi.mock('../../lib/supabaseClient', () => {
   return {
     supabase: {
       from: vi.fn(),
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
     },
   };
 });
@@ -45,7 +46,16 @@ describe('resourcesService', () => {
     const singleMock = vi.fn().mockResolvedValue({ data: { id: 'r1' }, error: null });
     const selectMock = vi.fn().mockReturnValue({ single: singleMock });
     const insertMock = vi.fn().mockReturnValue({ select: selectMock });
-    (supabase.from as any).mockReturnValue({ insert: insertMock });
+
+    const maybeSingleMock = vi.fn().mockResolvedValue({ data: { school_id: 'school-1' }, error: null });
+    const profileEqMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
+    const profileSelectMock = vi.fn().mockReturnValue({ eq: profileEqMock });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'resources') return { insert: insertMock };
+      if (table === 'profiles') return { select: profileSelectMock };
+      return {};
+    });
 
     const id = await createResource({
       type: 'game',

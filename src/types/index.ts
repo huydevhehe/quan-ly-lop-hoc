@@ -22,6 +22,13 @@ export interface Classroom {
   roomCode: string;
   createdBy?: string;
   createdByName?: string;
+  schoolId?: string;
+}
+
+export interface School {
+  id: string;
+  name: string;
+  createdAt: string;
 }
 
 export interface QuizQuestion {
@@ -68,6 +75,7 @@ export interface UserAccount {
   status: 'active' | 'locked';
   createdAt: string;
   mustChangePassword?: boolean;
+  schoolId?: string;
 }
 
 

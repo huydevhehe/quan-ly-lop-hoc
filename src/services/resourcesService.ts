@@ -35,6 +35,26 @@ export async function listResources(
 }
 
 /**
+ * Lấy school_id của người tạo (giáo viên); admin không gắn 1 trường cố định nên lấy
+ * trường đầu tiên trong hệ thống, để tiện ích tự thêm luôn có 1 trường sở hữu hợp lệ.
+ */
+async function resolveCreatorSchoolId(): Promise<string | null> {
+  const { data: userData } = await supabase.auth.getUser();
+  const uid = userData?.user?.id;
+  if (uid) {
+    const { data: profile } = await supabase.from('profiles').select('school_id').eq('id', uid).maybeSingle();
+    if (profile?.school_id) return profile.school_id;
+  }
+  const { data: firstSchool } = await supabase
+    .from('schools')
+    .select('id')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return firstSchool?.id || null;
+}
+
+/**
  * Tạo mới tài nguyên, validate URL hợp lệ (phải bắt đầu bằng http:// hoặc https://)
  */
 export async function createResource(input: Omit<Resource, 'id'>): Promise<string> {
@@ -42,6 +62,8 @@ export async function createResource(input: Omit<Resource, 'id'>): Promise<strin
   if (!/^https?:\/\//i.test(trimmedUrl)) {
     throw new Error('URL không hợp lệ');
   }
+
+  const schoolId = await resolveCreatorSchoolId();
 
   const { data, error } = await supabase
     .from('resources')
@@ -52,6 +74,7 @@ export async function createResource(input: Omit<Resource, 'id'>): Promise<strin
       url: trimmedUrl,
       thumbnail_url: input.thumbnailUrl?.trim() || null,
       is_active: input.isActive ?? false,
+      school_id: schoolId,
     })
     .select('id')
     .single();

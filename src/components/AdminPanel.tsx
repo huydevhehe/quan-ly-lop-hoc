@@ -26,9 +26,10 @@ import {
   Flame,
   Pencil,
 } from 'lucide-react';
-import { Classroom, Student, StudentPermissions, UserAccount, UserRole } from '../types';
+import { Classroom, School, Student, StudentPermissions, UserAccount, UserRole } from '../types';
 import { adminService } from '../services/adminService';
 import { listMyClasses } from '../services/classesService';
+import { listSchools, createSchool, renameSchool } from '../services/schoolsService';
 import { studentPermissionsService } from '../services/studentPermissionsService';
 import { soundManager } from '../utils/audio';
 
@@ -60,9 +61,57 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   students,
   currentUserId,
 }) => {
-  const [activeTab, setActiveTab] = useState<'permissions' | 'accounts' | 'assignments' | 'security'>('permissions');
+  const [activeTab, setActiveTab] = useState<'permissions' | 'accounts' | 'assignments' | 'schools' | 'security'>('permissions');
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
+
+  // Danh sách trường (multi-tenant): admin tạo trường, gán giáo viên vào trường
+  const [schools, setSchools] = useState<School[]>([]);
+  const [newSchoolName, setNewSchoolName] = useState('');
+  const [renamingSchoolId, setRenamingSchoolId] = useState<string | null>(null);
+  const [renamingSchoolName, setRenamingSchoolName] = useState('');
+
+  const refreshSchools = async () => {
+    try {
+      const list = await listSchools();
+      setSchools(list);
+    } catch {}
+  };
+
+  useEffect(() => {
+    refreshSchools();
+  }, []);
+
+  const handleCreateSchool = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSchoolName.trim()) return;
+    try {
+      await createSchool(newSchoolName.trim());
+      setNewSchoolName('');
+      await refreshSchools();
+      soundManager.playStarSound();
+    } catch (err: any) {
+      alert(`Không thể tạo trường: ${err.message || 'Lỗi không xác định'}`);
+    }
+  };
+
+  const handleStartRenameSchool = (s: School) => {
+    setRenamingSchoolId(s.id);
+    setRenamingSchoolName(s.name);
+  };
+
+  const handleSaveRenameSchool = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!renamingSchoolId || !renamingSchoolName.trim()) return;
+    try {
+      await renameSchool(renamingSchoolId, renamingSchoolName.trim());
+      setRenamingSchoolId(null);
+      await refreshSchools();
+      soundManager.playTick();
+    } catch (err: any) {
+      alert(`Không thể đổi tên trường: ${err.message || 'Lỗi không xác định'}`);
+    }
+  };
 
   // Cuộn về đầu trang khi đổi tab con: nếu đang cuộn xuống, thanh header dính (sticky) phía trên
   // sẽ che mất hàng nút chuyển tab và học sinh/giáo viên không bấm lại được.
@@ -116,6 +165,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newPassword, setNewPassword] = useState('123456');
   const [newFullName, setNewFullName] = useState('');
   const [newRole, setNewRole] = useState<UserRole>('teacher');
+  const [newSchoolId, setNewSchoolId] = useState('');
+
+  useEffect(() => {
+    if (!newSchoolId && schools.length > 0) {
+      setNewSchoolId(schools[0].id);
+    }
+  }, [schools, newSchoolId]);
 
   // Edit account state & form
   const [editingAccount, setEditingAccount] = useState<UserAccount | null>(null);
@@ -123,6 +179,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editFullName, setEditFullName] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [editRole, setEditRole] = useState<UserRole>('teacher');
+  const [editSchoolId, setEditSchoolId] = useState('');
 
   // Change admin password state
   const [adminOldPassword, setAdminOldPassword] = useState('');
@@ -190,6 +247,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setEditFullName(acc.fullName);
     setEditPassword('');
     setEditRole(acc.role);
+    setEditSchoolId(acc.schoolId || '');
   };
 
   const handleSaveEditAccount = async (e: React.FormEvent) => {
@@ -200,6 +258,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       await adminService.updateStaffProfile(editingAccount.id, {
         fullName: editFullName.trim(),
         role: editRole === 'admin' || editRole === 'teacher' ? editRole : undefined,
+        schoolId: editRole === 'teacher' ? editSchoolId || null : null,
       });
 
       if (editPassword.trim()) {
@@ -238,7 +297,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       alert('Mật khẩu phải có ít nhất 6 ký tự!');
       return;
     }
-    const result = await adminService.createStaffAccount(email, pwd, newFullName.trim(), newRole === 'admin' ? 'admin' : 'teacher');
+    const result = await adminService.createStaffAccount(
+      email,
+      pwd,
+      newFullName.trim(),
+      newRole === 'admin' ? 'admin' : 'teacher',
+      newRole === 'teacher' ? newSchoolId || undefined : undefined
+    );
 
     if ('error' in result) {
       alert(`Không thể tạo tài khoản: ${result.error}`);
@@ -327,6 +392,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             }`}
           >
             Phân công lớp
+          </button>
+          <button
+            onClick={() => setActiveTab('schools')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              activeTab === 'schools' ? 'bg-white text-purple-600 shadow-2xs font-bold' : 'text-slate-600'
+            }`}
+          >
+            Quản lý trường ({schools.length})
           </button>
           <button
             onClick={() => setActiveTab('security')}
@@ -546,6 +619,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <th className="py-3 px-4">Tên đăng nhập</th>
                     <th className="py-3 px-4">Họ và tên</th>
                     <th className="py-3 px-4">Vai trò</th>
+                    <th className="py-3 px-4">Trường</th>
                     <th className="py-3 px-4 text-center">Trạng thái</th>
                     <th className="py-3 px-4 text-right">Thao tác</th>
                   </tr>
@@ -578,6 +652,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             ? 'Giáo viên'
                             : 'Học sinh'}
                         </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-600">
+                        {acc.role === 'teacher'
+                          ? schools.find((s) => s.id === acc.schoolId)?.name || (
+                              <span className="text-slate-400 italic">Chưa gán</span>
+                            )
+                          : <span className="text-slate-400">—</span>}
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         <button
@@ -706,6 +787,81 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: QUẢN LÝ TRƯỜNG (multi-tenant) */}
+      {activeTab === 'schools' && (
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-2xs space-y-6 max-w-2xl mx-auto">
+          <div>
+            <span className="text-xs font-bold text-purple-600 uppercase tracking-wider">
+              QUẢN LÝ TRƯỜNG
+            </span>
+            <h3 className="text-xl font-bold text-slate-900 mt-1">Các trường trong hệ thống</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Mỗi giáo viên thuộc 1 trường và chỉ thấy lớp/học sinh của trường mình. Quản trị viên
+              (bạn) luôn thấy toàn bộ dữ liệu của mọi trường.
+            </p>
+          </div>
+
+          <form onSubmit={handleCreateSchool} className="flex items-center gap-2">
+            <input
+              type="text"
+              value={newSchoolName}
+              onChange={(e) => setNewSchoolName(e.target.value)}
+              placeholder="Tên trường mới..."
+              className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl"
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 bg-purple-600 text-white text-xs font-bold rounded-xl hover:bg-purple-700"
+            >
+              + Thêm trường
+            </button>
+          </form>
+
+          <div className="border border-slate-200 rounded-2xl divide-y divide-slate-100">
+            {schools.length === 0 ? (
+              <p className="py-6 px-4 text-center text-slate-400 text-xs">Chưa có trường nào.</p>
+            ) : (
+              schools.map((s) => (
+                <div key={s.id} className="flex items-center justify-between gap-3 py-3 px-4">
+                  {renamingSchoolId === s.id ? (
+                    <form onSubmit={handleSaveRenameSchool} className="flex items-center gap-2 flex-1">
+                      <input
+                        type="text"
+                        value={renamingSchoolName}
+                        onChange={(e) => setRenamingSchoolName(e.target.value)}
+                        autoFocus
+                        className="flex-1 px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg"
+                      />
+                      <button type="submit" className="px-2.5 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg">
+                        Lưu
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRenamingSchoolId(null)}
+                        className="px-2.5 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg"
+                      >
+                        Hủy
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <span className="font-semibold text-slate-800 text-sm">{s.name}</span>
+                      <button
+                        onClick={() => handleStartRenameSchool(s)}
+                        className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                        title="Đổi tên trường"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -872,6 +1028,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </p>
               </div>
 
+              {newRole === 'teacher' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Thuộc trường <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={newSchoolId}
+                    onChange={(e) => setNewSchoolId(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl bg-white font-medium"
+                    required
+                  >
+                    {schools.length === 0 && <option value="">Chưa có trường nào</option>}
+                    {schools.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Giáo viên chỉ thấy lớp/học sinh của trường này. Tạo trường mới ở thẻ "Quản lý trường".
+                  </p>
+                </div>
+              )}
+
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
@@ -963,6 +1143,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <option value="admin">🛡️ Quản trị viên</option>
                 </select>
               </div>
+
+              {editRole === 'teacher' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Thuộc trường
+                  </label>
+                  <select
+                    value={editSchoolId}
+                    onChange={(e) => setEditSchoolId(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl bg-white font-medium"
+                  >
+                    <option value="">-- Chưa gán trường --</option>
+                    {schools.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button

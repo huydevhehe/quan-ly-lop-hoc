@@ -7,6 +7,7 @@ export interface CreateClassInput {
   schoolYearId?: string;
   schoolYearName?: string;
   roomCode?: string;
+  schoolId?: string;
 }
 
 export interface UpdateClassInput {
@@ -41,6 +42,7 @@ export async function listMyClasses(): Promise<Classroom[]> {
       grade,
       room_code,
       school_year_id,
+      school_id,
       is_open,
       created_by,
       created_at,
@@ -70,8 +72,29 @@ export async function listMyClasses(): Promise<Classroom[]> {
       roomCode: c.room_code,
       createdBy: c.created_by || undefined,
       createdByName: creatorName || undefined,
+      schoolId: c.school_id || undefined,
     };
   });
+}
+
+/**
+ * Lấy school_id phù hợp khi không truyền sẵn: ưu tiên trường của người tạo (giáo viên),
+ * nếu là admin (không gắn 1 trường cố định) thì lấy trường đầu tiên trong hệ thống.
+ */
+async function resolveDefaultSchoolId(): Promise<string | null> {
+  const { data: userData } = await supabase.auth.getUser();
+  const uid = userData?.user?.id;
+  if (uid) {
+    const { data: profile } = await supabase.from('profiles').select('school_id').eq('id', uid).maybeSingle();
+    if (profile?.school_id) return profile.school_id;
+  }
+  const { data: firstSchool } = await supabase
+    .from('schools')
+    .select('id')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return firstSchool?.id || null;
 }
 
 /**
@@ -79,6 +102,7 @@ export async function listMyClasses(): Promise<Classroom[]> {
  */
 export async function createClass(input: CreateClassInput): Promise<Classroom> {
   const roomCode = input.roomCode?.trim().toUpperCase() || generateRoomCode();
+  const schoolId = input.schoolId || (await resolveDefaultSchoolId());
 
   const { data, error } = await supabase
     .from('classes')
@@ -87,6 +111,7 @@ export async function createClass(input: CreateClassInput): Promise<Classroom> {
       grade: input.grade,
       room_code: roomCode,
       school_year_id: input.schoolYearId || null,
+      school_id: schoolId,
       is_open: true,
     })
     .select()
@@ -103,6 +128,7 @@ export async function createClass(input: CreateClassInput): Promise<Classroom> {
     academicYear: input.schoolYearName || 'Chưa gán năm học',
     totalStudents: 0,
     roomCode: data.room_code,
+    schoolId: data.school_id || undefined,
   };
 }
 
