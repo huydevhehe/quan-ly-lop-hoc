@@ -78,15 +78,16 @@ export async function listMyClasses(): Promise<Classroom[]> {
 }
 
 /**
- * Lấy school_id phù hợp khi không truyền sẵn: ưu tiên trường của người tạo (giáo viên),
- * nếu là admin (không gắn 1 trường cố định) thì lấy trường đầu tiên trong hệ thống.
+ * Lấy uid + school_id của người đang tạo lớp: ưu tiên trường của chính người tạo (giáo
+ * viên tự tạo lớp của mình), nếu là admin (không gắn 1 trường cố định) và chưa chọn
+ * trường thì lấy trường đầu tiên trong hệ thống.
  */
-async function resolveDefaultSchoolId(): Promise<string | null> {
+async function resolveCreatorContext(): Promise<{ uid: string | null; schoolId: string | null }> {
   const { data: userData } = await supabase.auth.getUser();
-  const uid = userData?.user?.id;
+  const uid = userData?.user?.id || null;
   if (uid) {
     const { data: profile } = await supabase.from('profiles').select('school_id').eq('id', uid).maybeSingle();
-    if (profile?.school_id) return profile.school_id;
+    if (profile?.school_id) return { uid, schoolId: profile.school_id };
   }
   const { data: firstSchool } = await supabase
     .from('schools')
@@ -94,15 +95,17 @@ async function resolveDefaultSchoolId(): Promise<string | null> {
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
-  return firstSchool?.id || null;
+  return { uid, schoolId: firstSchool?.id || null };
 }
 
 /**
- * Tạo mới lớp học
+ * Tạo mới lớp học. Giáo viên tự tạo lớp của mình (created_by = chính họ) thì tự động
+ * là chủ lớp luôn, không cần admin "Phân công lớp" nữa.
  */
 export async function createClass(input: CreateClassInput): Promise<Classroom> {
   const roomCode = input.roomCode?.trim().toUpperCase() || generateRoomCode();
-  const schoolId = input.schoolId || (await resolveDefaultSchoolId());
+  const { uid, schoolId: defaultSchoolId } = await resolveCreatorContext();
+  const schoolId = input.schoolId || defaultSchoolId;
 
   const { data, error } = await supabase
     .from('classes')
@@ -112,6 +115,7 @@ export async function createClass(input: CreateClassInput): Promise<Classroom> {
       room_code: roomCode,
       school_year_id: input.schoolYearId || null,
       school_id: schoolId,
+      created_by: uid,
       is_open: true,
     })
     .select()

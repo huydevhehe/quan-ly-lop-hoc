@@ -58,7 +58,16 @@ describe('classesService', () => {
     const singleMock = vi.fn().mockResolvedValue({ data: mockCreated, error: null });
     const selectMock = vi.fn().mockReturnValue({ single: singleMock });
     const insertMock = vi.fn().mockReturnValue({ select: selectMock });
-    (supabase.from as any).mockReturnValue({ insert: insertMock });
+
+    const maybeSingleMock = vi.fn().mockResolvedValue({ data: { school_id: 'school-1' }, error: null });
+    const profileEqMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
+    const profileSelectMock = vi.fn().mockReturnValue({ eq: profileEqMock });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'classes') return { insert: insertMock };
+      if (table === 'profiles') return { select: profileSelectMock };
+      return {};
+    });
 
     const newClass = await createClass({
       name: 'Lớp 4B',
