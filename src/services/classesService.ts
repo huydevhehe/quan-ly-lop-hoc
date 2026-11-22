@@ -106,22 +106,41 @@ async function resolveCreatorContext(): Promise<{ uid: string | null; schoolId: 
  */
 export async function createClass(input: CreateClassInput): Promise<Classroom> {
   const roomCode = input.roomCode?.trim().toUpperCase() || generateRoomCode();
-  const { uid, schoolId: defaultSchoolId } = await resolveCreatorContext();
+  let { uid, schoolId: defaultSchoolId } = await resolveCreatorContext();
   const schoolId = input.schoolId || defaultSchoolId;
 
-  const { data, error } = await supabase
-    .from('classes')
-    .insert({
-      name: input.name.trim(),
-      grade: input.grade,
-      room_code: roomCode,
-      school_year_id: input.schoolYearId || null,
-      school_id: schoolId,
-      created_by: uid,
-      is_open: true,
-    })
-    .select()
-    .single();
+  const insertPayload = {
+    name: input.name.trim(),
+    grade: input.grade,
+    room_code: roomCode,
+    school_year_id: input.schoolYearId || null,
+    school_id: schoolId,
+    created_by: uid,
+    is_open: true,
+  };
+
+  let { data, error } = await supabase.from('classes').insert(insertPayload).select().single();
+
+  // Token phiên đăng nhập trong trình duyệt đôi khi hết hạn/chưa kịp tự làm mới, khiến
+  // request chạy dưới quyền "anon" thay vì tài khoản thật -> bị chặn bởi RLS. Thử làm
+  // mới phiên đăng nhập rồi tạo lại đúng 1 lần trước khi báo lỗi cho người dùng.
+  if (error?.code === '42501') {
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    const refreshedUid = refreshed?.session?.user?.id;
+    if (refreshedUid) {
+      const retry = await supabase
+        .from('classes')
+        .insert({ ...insertPayload, created_by: refreshedUid })
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
+  }
+
+  if (error?.code === '42501') {
+    throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng xuất rồi đăng nhập lại và thử tạo lớp lần nữa.');
+  }
 
   if (error || !data) {
     throw new Error(`Không thể tạo lớp học: ${error?.message}`);
