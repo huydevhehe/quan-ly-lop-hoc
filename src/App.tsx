@@ -32,7 +32,7 @@ import {
 import { soundManager } from './utils/audio';
 import confetti from 'canvas-confetti';
 import { restoreSession, signOut } from './services/authService';
-import { listMyClasses, updateClass } from './services/classesService';
+import { listMyClasses, updateClass, createClass } from './services/classesService';
 import { listStudentsByClass } from './services/studentsService';
 
 const GUEST_ACCOUNT: UserAccount = {
@@ -337,11 +337,28 @@ export default function App() {
     }));
   };
 
-  const handleRegenerateRoomCode = async () => {
-    if (!selectedClassId) {
-      alert('Bạn chưa có lớp học nào. Vào "Quản lý lớp học" để tạo lớp trước, mỗi lớp sẽ có mã phòng riêng.');
+  // Mở modal mã phòng: nếu chưa có lớp nào (tài khoản mới), tự tạo 1 "Phòng chung" mặc định
+  // ngay lúc này để luôn có mã phòng sẵn dùng - học sinh chỉ cần nhập mã, không cần biết gì
+  // về khái niệm "lớp học" cả.
+  const handleOpenRoomModal = async () => {
+    if (selectedClassId) {
+      setIsRoomModalOpen(true);
       return;
     }
+    try {
+      const newClass = await createClass({ name: 'Phòng chung', grade: 1 });
+      const cls = await listMyClasses();
+      setClassrooms(cls);
+      setSelectedClassId(newClass.id);
+    } catch (err: any) {
+      alert(err.message || 'Không thể tạo mã phòng, vui lòng thử lại.');
+      return;
+    }
+    setIsRoomModalOpen(true);
+  };
+
+  const handleRegenerateRoomCode = async () => {
+    if (!selectedClassId) return;
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let newCode = '';
     for (let i = 0; i < 6; i++) {
@@ -450,7 +467,7 @@ export default function App() {
       <Header
         onToggleSidebar={() => setIsMobileSidebarOpen(true)}
         roomCode={currentRoomCode}
-        onOpenRoomModal={() => setIsRoomModalOpen(true)}
+        onOpenRoomModal={handleOpenRoomModal}
         teacherName={teacherName}
         onOpenDownloadGuide={() => setIsDownloadModalOpen(true)}
         currentUser={currentUser}
@@ -469,7 +486,7 @@ export default function App() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           roomCode={currentRoomCode}
-          onOpenRoomModal={() => setIsRoomModalOpen(true)}
+          onOpenRoomModal={handleOpenRoomModal}
           isMobileOpen={isMobileSidebarOpen}
           setIsMobileOpen={setIsMobileSidebarOpen}
           teacherName={teacherName}
@@ -521,7 +538,7 @@ export default function App() {
                   setActiveTab(tab);
                 }}
                 roomCode={currentRoomCode}
-                onOpenRoomModal={() => setIsRoomModalOpen(true)}
+                onOpenRoomModal={handleOpenRoomModal}
                 teacherName={teacherName}
                 onOpenDownloadGuide={() => setIsDownloadModalOpen(true)}
                 currentUser={currentUser}
