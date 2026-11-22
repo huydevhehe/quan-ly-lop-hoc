@@ -1,24 +1,25 @@
 import { supabase } from '../lib/supabaseClient';
 
 /**
- * Luu/doc thoi khoa bieu ca nhan cua giao vien dang dang nhap, rieng cho tung LOP
- * (moi lop 1 ban ghi, khoa chinh la teacher_id + class_id).
+ * Luu/doc thoi khoa bieu ca nhan cua giao vien dang dang nhap, rieng cho tung NAM HOC
+ * (giao vien chi can biet buoi do day lop nao trong 1 tuan, khac truong/khac giao vien
+ * thi rieng vi khoa chinh la teacher_id + school_year_id).
  */
-export async function getMyTimetable(classId: string): Promise<string[][] | null> {
-  if (!classId) return null;
+export async function getMyTimetable(schoolYearId: string): Promise<string[][] | null> {
+  if (!schoolYearId) return null;
 
   const { data, error } = await supabase
     .from('teacher_timetables')
     .select('grid')
-    .eq('class_id', classId)
+    .eq('school_year_id', schoolYearId)
     .maybeSingle();
 
   if (error || !data) return null;
   return (data.grid as string[][]) || null;
 }
 
-export async function saveMyTimetable(grid: string[][], classId: string): Promise<void> {
-  if (!classId) throw new Error('Chưa chọn lớp, không thể lưu thời khóa biểu.');
+export async function saveMyTimetable(grid: string[][], schoolYearId: string): Promise<void> {
+  if (!schoolYearId) throw new Error('Chưa chọn năm học, không thể lưu thời khóa biểu.');
 
   const { data: sessionRes } = await supabase.auth.getSession();
   const uid = sessionRes?.session?.user?.id;
@@ -27,8 +28,8 @@ export async function saveMyTimetable(grid: string[][], classId: string): Promis
   const { error } = await supabase
     .from('teacher_timetables')
     .upsert(
-      { teacher_id: uid, class_id: classId, grid, updated_at: new Date().toISOString() },
-      { onConflict: 'teacher_id,class_id' }
+      { teacher_id: uid, school_year_id: schoolYearId, grid, updated_at: new Date().toISOString() },
+      { onConflict: 'teacher_id,school_year_id' }
     );
 
   if (error) {
@@ -36,8 +37,8 @@ export async function saveMyTimetable(grid: string[][], classId: string): Promis
   }
 }
 
-export async function deleteMyTimetable(classId: string): Promise<void> {
-  if (!classId) return;
+export async function deleteMyTimetable(schoolYearId: string): Promise<void> {
+  if (!schoolYearId) return;
 
   const { data: sessionRes } = await supabase.auth.getSession();
   const uid = sessionRes?.session?.user?.id;
@@ -47,7 +48,7 @@ export async function deleteMyTimetable(classId: string): Promise<void> {
     .from('teacher_timetables')
     .delete()
     .eq('teacher_id', uid)
-    .eq('class_id', classId);
+    .eq('school_year_id', schoolYearId);
 
   if (error) {
     throw new Error(`Không thể xóa thời khóa biểu: ${error.message}`);

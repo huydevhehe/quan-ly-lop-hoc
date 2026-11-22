@@ -212,12 +212,12 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   const [timetableSaveState, setTimetableSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const timetableSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timetableLoadedRef = useRef(false);
-  // Lớp đang xem/sửa TKB (mỗi lớp 1 bảng TKB riêng)
-  const [timetableClassId, setTimetableClassId] = useState<string>('');
 
-  // Tai thoi khoa bieu that tu Supabase theo LOP dang chon (moi lop 1 ban rieng)
+  // Tai thoi khoa bieu that tu Supabase theo NAM HOC dang chon (giao vien chi can biet
+  // buoi do day lop nao trong 1 tuan - khac truong/khac giao vien thi rieng)
   useEffect(() => {
-    if (!timetableClassId) {
+    const schoolYearId = yearNameToId[currentYear];
+    if (!schoolYearId) {
       setTimetable(Array(10).fill(null).map(() => Array(5).fill('')));
       return;
     }
@@ -225,7 +225,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     timetableLoadedRef.current = false;
     setTimetable(Array(10).fill(null).map(() => Array(5).fill('')));
 
-    getMyTimetable(timetableClassId)
+    getMyTimetable(schoolYearId)
       .then((grid) => {
         if (grid && grid.length > 0) {
           setTimetable(Array(10).fill(null).map((_, i) => Array(5).fill(null).map((_, j) => grid[i]?.[j] || '')));
@@ -235,7 +235,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       .finally(() => {
         timetableLoadedRef.current = true;
       });
-  }, [timetableClassId]);
+  }, [currentYear, yearNameToId]);
 
   const fetchClasses = async () => {
     try {
@@ -686,16 +686,6 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     });
   }, [visibleClassesInCurrentYear]);
 
-  // Tự động chọn lớp mặc định cho bảng TKB khi đổi năm học / đổi tài khoản
-  useEffect(() => {
-    if (filteredClasses.length === 0) {
-      if (timetableClassId !== '') setTimetableClassId('');
-      return;
-    }
-    const exists = filteredClasses.some((c: ClassItem) => c.id === timetableClassId);
-    if (!exists) setTimetableClassId(filteredClasses[0].id);
-  }, [filteredClasses]);
-
   // Tự động đồng bộ currentClassId khi đổi tài khoản hoặc đổi năm học
   useEffect(() => {
     if (visibleClassesInCurrentYear.length > 0) {
@@ -871,7 +861,8 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
 
   // Action: Timetable cell update - debounce luu that len Supabase (khong chi doi local nua)
   const handleTimetableChange = (rowIdx: number, colIdx: number, value: string) => {
-    if (!canManage || !timetableClassId) return;
+    const schoolYearId = yearNameToId[currentYear];
+    if (!canManage || !schoolYearId) return;
     setTimetable((prev) => {
       const next = prev.map((row) => [...row]);
       next[rowIdx][colIdx] = value;
@@ -879,7 +870,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       if (timetableSaveTimerRef.current) clearTimeout(timetableSaveTimerRef.current);
       setTimetableSaveState('saving');
       timetableSaveTimerRef.current = setTimeout(() => {
-        saveMyTimetable(next, timetableClassId)
+        saveMyTimetable(next, schoolYearId)
           .then(() => setTimetableSaveState('saved'))
           .catch(() => setTimetableSaveState('error'));
       }, 800);
@@ -888,15 +879,16 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     });
   };
 
-  // Action: Xoá toàn bộ TKB của lớp đang xem
+  // Action: Xoá toàn bộ TKB của năm học đang xem
   const handleClearTimetable = () => {
-    if (!canManage || !timetableClassId) return;
-    if (!window.confirm('Xoá toàn bộ thời khóa biểu của lớp này? Hành động không thể hoàn tác.')) return;
+    const schoolYearId = yearNameToId[currentYear];
+    if (!canManage || !schoolYearId) return;
+    if (!window.confirm('Xoá toàn bộ thời khóa biểu của năm học này? Hành động không thể hoàn tác.')) return;
 
     const blank = Array(10).fill(null).map(() => Array(5).fill(''));
     setTimetable(blank);
     setTimetableSaveState('saving');
-    deleteMyTimetable(timetableClassId)
+    deleteMyTimetable(schoolYearId)
       .then(() => setTimetableSaveState('saved'))
       .catch(() => setTimetableSaveState('error'));
   };
@@ -1786,28 +1778,15 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             <h2 className="text-3xl font-black text-slate-900 tracking-tight">Quản lý lớp học</h2>
           </div>
 
-          {/* Thời khóa biểu cá nhân (mỗi lớp 1 bảng riêng) */}
+          {/* Thời khóa biểu cá nhân (theo năm học - 1 tuần dạy lớp nào buổi nào) */}
           <div className="bg-white p-6 shadow-sm border border-slate-200 rounded-2xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
               <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-blue-600" />
-                <span>Thời khóa biểu</span>
-                {filteredClasses.length > 0 && (
-                  <select
-                    value={timetableClassId}
-                    onChange={(e) => setTimetableClassId(e.target.value)}
-                    className="ml-1 text-sm font-semibold border border-slate-200 rounded-lg px-2.5 py-1 bg-slate-50 text-slate-700 outline-none focus:ring-1 focus:ring-blue-400"
-                  >
-                    {filteredClasses.map((cls: ClassItem) => (
-                      <option key={cls.id} value={cls.id}>
-                        {cls.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                <span>Thời khóa biểu cá nhân</span>
               </h3>
               <div className="flex items-center gap-2">
-                {canManage && timetableClassId && (
+                {canManage && yearNameToId[currentYear] && (
                   <button
                     onClick={handleClearTimetable}
                     className="inline-flex items-center gap-1.5 text-xs bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 px-3 py-1 rounded-full font-bold transition-colors"
