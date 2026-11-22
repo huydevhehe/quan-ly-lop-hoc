@@ -92,6 +92,7 @@ export interface QuizSubmission {
   sessionId?: string;
   studentName: string;
   className: string;
+  schoolName?: string;
   grade: number;
   score: number; // thang điểm 10
   totalQuestions: number;

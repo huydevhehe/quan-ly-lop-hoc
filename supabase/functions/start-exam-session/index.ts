@@ -35,7 +35,7 @@ Deno.serve(async (req: Request) => {
 
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
     const body = await req.json();
-    const { studentName, classId, isFreeSlot = false, topicIds = [] } = body;
+    const { studentName, classId, isFreeSlot = false, topicIds = [], schoolName } = body;
 
     if (!studentName || !topicIds || topicIds.length === 0) {
       return new Response(
@@ -100,6 +100,7 @@ Deno.serve(async (req: Request) => {
         student_name: studentName,
         class_id: classId || null,
         is_free_slot: isFreeSlot,
+        school_name: schoolName || null,
         topic_ids: topicIds,
         question_order: questionOrder,
       })

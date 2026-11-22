@@ -338,7 +338,10 @@ export default function App() {
   };
 
   const handleRegenerateRoomCode = async () => {
-    if (!selectedClassId) return;
+    if (!selectedClassId) {
+      alert('Bạn chưa có lớp học nào. Vào "Quản lý lớp học" để tạo lớp trước, mỗi lớp sẽ có mã phòng riêng.');
+      return;
+    }
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let newCode = '';
     for (let i = 0; i < 6; i++) {

@@ -392,6 +392,7 @@ export async function listExamResults(classId?: string): Promise<QuizSubmission[
         id,
         student_name,
         class_id,
+        school_name,
         classes (name, grade)
       )
     `)
@@ -415,6 +416,7 @@ export async function listExamResults(classId?: string): Promise<QuizSubmission[
       sessionId: session.id,
       studentName: session.student_name || 'Học sinh',
       className: cls.name || 'Tự do',
+      schoolName: session.school_name || undefined,
       grade: cls.grade || 1,
       score: r.score !== null ? Number(r.score) : 0,
       totalQuestions: 10,

@@ -46,7 +46,8 @@ export async function startExamSession(
   studentName: string,
   classId: string | null,
   isFreeSlot: boolean,
-  topicIds: string[]
+  topicIds: string[],
+  schoolName?: string
 ): Promise<ExamSessionResult> {
   if (topicIds.length === 0) {
     throw new Error('Vui lòng chọn ít nhất một chủ đề thi');
@@ -56,7 +57,7 @@ export async function startExamSession(
   if (supabase.functions && typeof supabase.functions.invoke === 'function') {
     try {
       const { data, error } = await supabase.functions.invoke('start-exam-session', {
-        body: { studentName, classId, isFreeSlot, topicIds },
+        body: { studentName, classId, isFreeSlot, topicIds, schoolName },
       });
       if (!error && data && data.sessionId) {
         return data as ExamSessionResult;
@@ -91,6 +92,7 @@ export async function startExamSession(
       student_name: studentName.trim(),
       class_id: classId || null,
       is_free_slot: isFreeSlot,
+      school_name: schoolName || null,
       topic_ids: topicIds,
       question_order: questionOrder,
     })

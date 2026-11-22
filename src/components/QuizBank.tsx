@@ -760,6 +760,9 @@ export const QuizBank: React.FC<QuizBankProps> = ({ isAdmin = true }) => {
                             <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium text-[11px]">
                               {sub.className || 'Tự do'}
                             </span>
+                            {sub.schoolName && (
+                              <span className="block text-[10px] text-slate-400 mt-0.5">{sub.schoolName}</span>
+                            )}
                           </td>
                           <td className="py-3 px-3 text-center">
                             <span className="font-bold text-sky-700">Khối {sub.grade}</span>
