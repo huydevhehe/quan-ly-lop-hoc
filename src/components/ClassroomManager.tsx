@@ -213,9 +213,15 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   const timetableSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timetableLoadedRef = useRef(false);
 
-  // Tai thoi khoa bieu that tu Supabase khi mo man "Quan ly lop hoc"
+  // Tai thoi khoa bieu that tu Supabase theo nam hoc dang chon (moi nam 1 ban rieng)
   useEffect(() => {
-    getMyTimetable()
+    const schoolYearId = yearNameToId[currentYear];
+    if (!schoolYearId) return;
+
+    timetableLoadedRef.current = false;
+    setTimetable(Array(10).fill(null).map(() => Array(5).fill('')));
+
+    getMyTimetable(schoolYearId)
       .then((grid) => {
         if (grid && grid.length > 0) {
           setTimetable(Array(10).fill(null).map((_, i) => Array(5).fill(null).map((_, j) => grid[i]?.[j] || '')));
@@ -225,7 +231,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       .finally(() => {
         timetableLoadedRef.current = true;
       });
-  }, []);
+  }, [currentYear, yearNameToId]);
 
   const fetchClasses = async () => {
     try {
@@ -856,10 +862,11 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       const next = prev.map((row) => [...row]);
       next[rowIdx][colIdx] = value;
 
+      const schoolYearId = yearNameToId[currentYear];
       if (timetableSaveTimerRef.current) clearTimeout(timetableSaveTimerRef.current);
       setTimetableSaveState('saving');
       timetableSaveTimerRef.current = setTimeout(() => {
-        saveMyTimetable(next)
+        saveMyTimetable(next, schoolYearId)
           .then(() => setTimetableSaveState('saved'))
           .catch(() => setTimetableSaveState('error'));
       }, 800);
