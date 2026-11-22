@@ -39,8 +39,8 @@ export async function listResources(
  * trường đầu tiên trong hệ thống, để tiện ích tự thêm luôn có 1 trường sở hữu hợp lệ.
  */
 async function resolveCreatorSchoolId(): Promise<string | null> {
-  const { data: userData } = await supabase.auth.getUser();
-  const uid = userData?.user?.id;
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData?.session?.user?.id;
   if (uid) {
     const { data: profile } = await supabase.from('profiles').select('school_id').eq('id', uid).maybeSingle();
     if (profile?.school_id) return profile.school_id;

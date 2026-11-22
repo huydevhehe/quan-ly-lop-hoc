@@ -83,8 +83,10 @@ export async function listMyClasses(): Promise<Classroom[]> {
  * trường thì lấy trường đầu tiên trong hệ thống.
  */
 async function resolveCreatorContext(): Promise<{ uid: string | null; schoolId: string | null }> {
-  const { data: userData } = await supabase.auth.getUser();
-  const uid = userData?.user?.id || null;
+  // Dùng getSession() (đọc từ local storage) thay vì getUser() (gọi mạng xác thực lại
+  // với server) để không bị lỗi RLS khi tạo lớp lúc mạng chập chờn/getUser() timeout.
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData?.session?.user?.id || null;
   if (uid) {
     const { data: profile } = await supabase.from('profiles').select('school_id').eq('id', uid).maybeSingle();
     if (profile?.school_id) return { uid, schoolId: profile.school_id };

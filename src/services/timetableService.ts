@@ -20,8 +20,8 @@ export async function getMyTimetable(classId: string): Promise<string[][] | null
 export async function saveMyTimetable(grid: string[][], classId: string): Promise<void> {
   if (!classId) throw new Error('Chưa chọn lớp, không thể lưu thời khóa biểu.');
 
-  const { data: userRes } = await supabase.auth.getUser();
-  const uid = userRes?.user?.id;
+  const { data: sessionRes } = await supabase.auth.getSession();
+  const uid = sessionRes?.session?.user?.id;
   if (!uid) throw new Error('Chưa đăng nhập, không thể lưu thời khóa biểu.');
 
   const { error } = await supabase
@@ -39,8 +39,8 @@ export async function saveMyTimetable(grid: string[][], classId: string): Promis
 export async function deleteMyTimetable(classId: string): Promise<void> {
   if (!classId) return;
 
-  const { data: userRes } = await supabase.auth.getUser();
-  const uid = userRes?.user?.id;
+  const { data: sessionRes } = await supabase.auth.getSession();
+  const uid = sessionRes?.session?.user?.id;
   if (!uid) throw new Error('Chưa đăng nhập, không thể xóa thời khóa biểu.');
 
   const { error } = await supabase

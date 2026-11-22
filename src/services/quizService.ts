@@ -321,7 +321,7 @@ export async function listQuestionsByTopic(topicId: string): Promise<QuizQuestio
  * Tạo câu hỏi mới trong chủ đề
  */
 export async function createQuestion(input: Omit<QuizQuestion, 'id'>): Promise<string> {
-  const { data: userRes } = await supabase.auth.getUser();
+  const { data: sessionRes } = await supabase.auth.getSession();
 
   const { data, error } = await supabase
     .from('quiz_questions')
@@ -334,7 +334,7 @@ export async function createQuestion(input: Omit<QuizQuestion, 'id'>): Promise<s
       // Can luu created_by de giao vien (khong phai admin) sau nay con duoc sua/xoa
       // chinh cau hoi minh tao - RLS "quiz_questions_teacher_update/delete" doi hoi
       // created_by = auth.uid(), de trong se khien khong ai tru admin sua/xoa duoc.
-      created_by: userRes?.user?.id || null,
+      created_by: sessionRes?.session?.user?.id || null,
     })
     .select('id')
     .single();
