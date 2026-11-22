@@ -412,7 +412,7 @@ export default function App() {
           roomCode={currentRoomCode}
           teacherUsername={
             currentUser.role === 'admin' || currentUser.role === 'teacher'
-              ? currentUser.username
+              ? currentUser.fullName || currentUser.username
               : classrooms.find((c) => c.id === selectedClassId)?.createdByName || 'Giáo viên'
           }
           classrooms={classrooms}
