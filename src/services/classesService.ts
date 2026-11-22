@@ -48,7 +48,7 @@ export async function listMyClasses(): Promise<Classroom[]> {
       created_at,
       students (count),
       school_years (name),
-      profiles (full_name)
+      profiles!classes_created_by_fkey (full_name)
     `)
     .order('created_at', { ascending: false });
 
