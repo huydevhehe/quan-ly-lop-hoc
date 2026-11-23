@@ -407,15 +407,16 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               note: a.note || '',
             };
           });
-          Object.entries(evalList).forEach(([stId, comment]) => {
+          Object.entries(evalList).forEach(([stId, ev]) => {
             const key = `${stId}_${currentWeek}`;
             if (map[key]) {
-              map[key].note = comment;
+              map[key].note = ev.comment;
+              map[key].rank = ev.rank as EvalRecord['rank'];
             } else {
               map[key] = {
                 status: 'Để trống',
-                rank: '',
-                note: comment,
+                rank: ev.rank as EvalRecord['rank'],
+                note: ev.comment,
               };
             }
           });
@@ -852,8 +853,8 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       },
     ]).catch(() => {});
 
-    if (evalCustomText.trim()) {
-      saveWeekEvaluation(selectedEvalStudentId, currentWeek, evalCustomText.trim()).catch(() => {});
+    if (evalCustomText.trim() || currentRankVal) {
+      saveWeekEvaluation(selectedEvalStudentId, currentWeek, evalCustomText.trim(), currentRankVal).catch(() => {});
     }
 
     setTimeout(() => setSaveEvalSuccess(false), 1500);
@@ -1245,9 +1246,11 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
 
       // Gộp dữ liệu từng tuần theo học sinh, cho sheet Tổng hợp
       const summaryAttendanceByStudent: Record<string, string[]> = {};
+      const summaryRankByStudent: Record<string, string[]> = {};
       const summaryNoteByStudent: Record<string, string[]> = {};
       students.forEach((st) => {
         summaryAttendanceByStudent[st.id] = [];
+        summaryRankByStudent[st.id] = [];
         summaryNoteByStudent[st.id] = [];
       });
 
@@ -1258,15 +1261,18 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
         const weekRows = students.map((st, idx) => {
           const att = attMap[st.id];
           const statusLabel = att ? ATTENDANCE_STATUS_LABEL[att.status] || '' : '';
-          const note = evalMap[st.id] || '';
+          const ev = evalMap[st.id];
+          const note = ev?.comment || '';
+          const rank = ev?.rank || '';
           if (statusLabel) summaryAttendanceByStudent[st.id].push(`Tuần ${w}: ${statusLabel}`);
+          if (rank) summaryRankByStudent[st.id].push(`Tuần ${w}: ${rank}`);
           if (note.trim()) summaryNoteByStudent[st.id].push(`Tuần ${w}: ${note.trim()}`);
           return {
             STT: idx + 1,
             'Mã học sinh': st.code,
             'Họ và tên': st.name,
             'Điểm danh': statusLabel,
-            'Đánh giá': '',
+            'Đánh giá': rank,
             'Nhận xét': note,
           };
         });
@@ -1290,7 +1296,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
         st.code,
         st.name,
         summaryAttendanceByStudent[st.id].join('\n'),
-        '',
+        summaryRankByStudent[st.id].join('\n'),
         summaryNoteByStudent[st.id].join('\n'),
       ]);
       const summarySheetData: any[][] = [

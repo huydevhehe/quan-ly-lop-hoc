@@ -74,19 +74,25 @@ export async function saveWeekAttendance(
   }
 }
 
+export interface EvaluationRecord {
+  comment: string;
+  rank: string;
+}
+
 /**
  * Lấy nhận xét / đánh giá tuần của lớp theo số tuần (1-35)
- * Trả về Map / Record với key là student_id, value là chuỗi nhận xét
+ * Trả về Map / Record với key là student_id, value là { comment, rank }
  */
 export async function getWeekEvaluations(
   classId: string,
   weekNumber: number
-): Promise<Record<string, string>> {
+): Promise<Record<string, EvaluationRecord>> {
   const { data, error } = await supabase
     .from('weekly_evaluations')
     .select(`
       student_id,
       comment,
+      rank,
       students!inner (
         class_id
       )
@@ -98,10 +104,10 @@ export async function getWeekEvaluations(
     throw new Error(`Lỗi khi tải nhận xét tuần ${weekNumber}: ${error.message}`);
   }
 
-  const result: Record<string, string> = {};
+  const result: Record<string, EvaluationRecord> = {};
   for (const item of data || []) {
-    if (item.comment) {
-      result[item.student_id] = item.comment;
+    if (item.comment || item.rank) {
+      result[item.student_id] = { comment: item.comment || '', rank: item.rank || '' };
     }
   }
 
@@ -109,12 +115,13 @@ export async function getWeekEvaluations(
 }
 
 /**
- * Lưu / cập nhật nhận xét tuần cho 1 học sinh
+ * Lưu / cập nhật nhận xét + đánh giá (xếp loại) tuần cho 1 học sinh
  */
 export async function saveWeekEvaluation(
   studentId: string,
   weekNumber: number,
-  comment: string
+  comment: string,
+  rank: string = ''
 ): Promise<void> {
   const { error } = await supabase
     .from('weekly_evaluations')
@@ -123,6 +130,7 @@ export async function saveWeekEvaluation(
         student_id: studentId,
         week_number: weekNumber,
         comment: comment.trim(),
+        rank: rank || null,
       },
       { onConflict: 'student_id,week_number' }
     );

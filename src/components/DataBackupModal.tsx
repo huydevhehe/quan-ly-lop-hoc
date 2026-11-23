@@ -40,7 +40,7 @@ interface BackupPayload {
     students: Array<{ code: string; name: string }>;
     scores: Array<{ studentCode: string; semester: Semester; theoryScore: number | null; practiceScore: number | null }>;
     attendance: Array<{ studentCode: string; weekNumber: number; status: AttendanceStatus; note?: string }>;
-    evaluations: Array<{ studentCode: string; weekNumber: number; comment: string }>;
+    evaluations: Array<{ studentCode: string; weekNumber: number; comment: string; rank?: string }>;
   }>;
   resources: Array<{ type: 'video' | 'link' | 'game'; grade?: number; title: string; url: string; thumbnailUrl?: string; isActive: boolean }>;
   quizTopics: Array<{
@@ -87,9 +87,9 @@ async function buildFullBackupPayload(): Promise<BackupPayload> {
           const code = studentCodeById.get(studentId);
           if (code) attendance.push({ studentCode: code, weekNumber: week, status: rec.status, note: rec.note });
         }
-        for (const [studentId, comment] of Object.entries(evalMap)) {
+        for (const [studentId, ev] of Object.entries(evalMap)) {
           const code = studentCodeById.get(studentId);
-          if (code) evaluations.push({ studentCode: code, weekNumber: week, comment });
+          if (code) evaluations.push({ studentCode: code, weekNumber: week, comment: ev.comment, rank: ev.rank });
         }
       }
 
@@ -198,7 +198,7 @@ async function restoreFromBackupPayload(payload: BackupPayload): Promise<{ resto
     for (const ev of clsBackup.evaluations) {
       const studentId = studentIdByCode.get(ev.studentCode);
       if (studentId) {
-        await saveWeekEvaluation(studentId, ev.weekNumber, ev.comment);
+        await saveWeekEvaluation(studentId, ev.weekNumber, ev.comment, ev.rank || '');
       }
     }
   }
