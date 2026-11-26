@@ -191,7 +191,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setPermissions((prev) => {
       const updated = { ...prev, [key]: !prev[key] };
       localStorage.setItem('qllh_student_permissions', JSON.stringify(updated));
-      studentPermissionsService.updatePermissions({ [key]: updated[key] }).catch(() => {});
+      studentPermissionsService
+        .updatePermissions({ [key]: updated[key] })
+        .catch((err) => alert(err.message || 'Không thể lưu cấu hình phân quyền, vui lòng thử lại.'));
       return updated;
     });
     setSaveToast(true);

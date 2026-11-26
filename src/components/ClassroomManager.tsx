@@ -825,7 +825,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   };
 
   // Action: Save Student Evaluation
-  const handleSaveStudentEval = () => {
+  const handleSaveStudentEval = async () => {
     if (!selectedEvalStudentId) return;
     const key = `${selectedEvalStudentId}_${currentWeek}`;
     setEvalData((prev) => ({
@@ -836,28 +836,34 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
         note: evalCustomText,
       },
     }));
-    setSaveEvalSuccess(true);
 
-    // Lưu vào Supabase attendance & weekly_evaluations
+    // Lưu vào Supabase attendance & weekly_evaluations - chỉ báo "Đã lưu" sau khi
+    // chắc chắn 2 lệnh ghi đều thành công, tránh báo thành công giả khi RLS/mạng lỗi.
     const attStatus =
       currentAttVal === 'Có mặt'
         ? 'present'
         : currentAttVal === 'Vắng'
         ? 'unexcused'
         : 'present';
-    saveWeekAttendance(currentWeek, [
-      {
-        studentId: selectedEvalStudentId,
-        status: attStatus,
-        note: evalCustomText,
-      },
-    ]).catch(() => {});
 
-    if (evalCustomText.trim() || currentRankVal) {
-      saveWeekEvaluation(selectedEvalStudentId, currentWeek, evalCustomText.trim(), currentRankVal).catch(() => {});
+    try {
+      await Promise.all([
+        saveWeekAttendance(currentWeek, [
+          {
+            studentId: selectedEvalStudentId,
+            status: attStatus,
+            note: evalCustomText,
+          },
+        ]),
+        evalCustomText.trim() || currentRankVal
+          ? saveWeekEvaluation(selectedEvalStudentId, currentWeek, evalCustomText.trim(), currentRankVal)
+          : Promise.resolve(),
+      ]);
+      setSaveEvalSuccess(true);
+      setTimeout(() => setSaveEvalSuccess(false), 1500);
+    } catch (err: any) {
+      alert(err.message || 'Không thể lưu đánh giá học sinh, vui lòng thử lại.');
     }
-
-    setTimeout(() => setSaveEvalSuccess(false), 1500);
   };
 
   // Action: Timetable cell update - debounce luu that len Supabase (khong chi doi local nua)
@@ -1122,7 +1128,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
           dob: field === 'dob' ? val : target.dob,
           gender: field === 'gender' ? val : target.gender,
         },
-      ]).catch(() => {});
+      ]).catch((err) => alert(err.message || 'Không thể lưu thông tin học sinh, vui lòng thử lại.'));
     }
   };
 
@@ -1173,7 +1179,9 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
         }
         gradeSaveTimersRef.current[timerKey] = setTimeout(() => {
           delete gradeSaveTimersRef.current[timerKey];
-          saveScore(stId, semParam, ltNum, thNum).catch(() => {});
+          saveScore(stId, semParam, ltNum, thNum).catch((err) =>
+            alert(err.message || 'Không thể lưu điểm, vui lòng thử lại.')
+          );
         }, 600);
       }
     }
