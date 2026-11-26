@@ -1956,10 +1956,6 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <h3 className="font-black text-slate-900 text-2xl tracking-tight">{currentYear}</h3>
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  CSDL độc lập: {currentUser?.fullName || 'Giáo viên'} ({currentUser?.role === 'admin' ? 'Quản trị viên' : 'Giáo viên'})
-                </span>
               </div>
               <div className="flex flex-wrap items-center gap-2 mt-4">
                 {canManage && (
@@ -1969,34 +1965,6 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                   >
                     <Plus className="w-4 h-4" /> Tạo lớp mới
                   </button>
-                )}
-
-                {/* Quản trị viên: Tùy chọn xem lớp của tôi hoặc xem tất cả giáo viên */}
-                {currentUser?.role === 'admin' && (
-                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold border border-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => setAdminViewAll(false)}
-                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                        !adminViewAll
-                          ? 'bg-white text-blue-700 shadow-2xs font-bold'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      📁 Chỉ lớp của tôi ({normalizedClasses.filter((c: ClassItem) => (c.createdBy === currentUser?.id || c.createdBy === currentUser?.username) && c.year === currentYear).length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAdminViewAll(true)}
-                      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                        adminViewAll
-                          ? 'bg-white text-purple-700 shadow-2xs font-bold'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      🌐 Tất cả giáo viên ({normalizedClasses.filter((c: ClassItem) => c.year === currentYear).length})
-                    </button>
-                  </div>
                 )}
               </div>
             </div>

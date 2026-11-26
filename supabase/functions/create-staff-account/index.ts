@@ -107,6 +107,27 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // 6. Giáo viên mới luôn có sẵn 1 mã phòng học ngay (không cần tự bấm tạo lớp lần đầu).
+    // Dùng service_role nên không bị ảnh hưởng bởi RLS; thử tối đa 3 lần nếu trùng mã ngẫu nhiên.
+    if (role === "teacher") {
+      const ROOM_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      const generateRoomCode = () =>
+        Array.from({ length: 6 }, () => ROOM_CODE_CHARS[Math.floor(Math.random() * ROOM_CODE_CHARS.length)]).join("");
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { error: classError } = await adminClient.from("classes").insert({
+          name: "Phòng chung",
+          grade: 1,
+          room_code: generateRoomCode(),
+          school_id: schoolId || null,
+          created_by: newUserData.user.id,
+          is_open: true,
+        });
+        if (!classError) break;
+        if (classError.code !== "23505") break; // lỗi khác trùng mã thì không thử lại nữa
+      }
+    }
+
     return new Response(
       JSON.stringify({ userId: newUserData.user.id }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -452,37 +452,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Bottom Section: Mã phòng học & User info */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/50 space-y-2.5">
-          {/* Cloud Sync Status & Manual Sync Button */}
-          <div className="p-2.5 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50/80 border border-blue-200/90 flex items-center justify-between shadow-2xs">
-            <div className="flex items-center gap-2">
-              <span
-                className={`w-2.5 h-2.5 rounded-full ${
-                  isCloudConnected ? 'bg-emerald-500 shadow-sm shadow-emerald-400' : 'bg-amber-400'
-                } ${isSyncingCloud ? 'animate-ping' : ''}`}
-              ></span>
-              <div>
-                <div className="text-[11px] font-extrabold text-slate-800 leading-tight">
-                  {isSyncingCloud ? 'Đang đồng bộ...' : 'Đám mây Supabase'}
-                </div>
-                <div className="text-[9px] font-semibold text-emerald-700">
-                  {isCloudConnected ? '● CSDL thống nhất mọi máy' : 'Đang kết nối...'}
-                </div>
-              </div>
-            </div>
-            {onManualSyncCloud && (
-              <button
-                type="button"
-                onClick={onManualSyncCloud}
-                disabled={isSyncingCloud}
-                className="text-[10px] font-bold text-blue-700 hover:text-white hover:bg-blue-600 bg-white px-2 py-1 rounded-lg border border-blue-200 shadow-2xs transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 active:scale-95"
-                title="Bấm để đồng bộ ngay dữ liệu mới nhất từ các máy tính khác"
-              >
-                <RefreshCw className={`w-3 h-3 ${isSyncingCloud ? 'animate-spin' : ''}`} />
-                <span>Đồng bộ</span>
-              </button>
-            )}
-          </div>
-
           {/* Backup toan bo du lieu - phong khi can khoi phuc lai tu may khac hoac lo mat du lieu */}
           {onOpenBackup && (
             <button

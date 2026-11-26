@@ -187,34 +187,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             </button>
           </div>
 
-          {/* Quick interactive actions under room code */}
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-            {onSwitchToStudentPortal && (
-              <button
-                onClick={onSwitchToStudentPortal}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 shadow-2xs transition-all cursor-pointer"
-              >
-                <span>👁️ Xem Cổng Học sinh ({roomCode})</span>
-              </button>
-            )}
-            <button
-              onClick={onOpenRoomModal}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>Xem mã QR & Link học sinh</span>
-            </button>
-            <button
-              onClick={onOpenDownloadGuide}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Cài đặt ứng dụng về máy</span>
-            </button>
-            <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md font-medium">
-              ● Phòng đang mở
-            </span>
-          </div>
         </div>
       </div>
 
