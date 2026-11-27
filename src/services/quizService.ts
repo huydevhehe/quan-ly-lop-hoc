@@ -96,11 +96,15 @@ export async function bulkInsertQuestions(
 ): Promise<void> {
   if (!rows || rows.length === 0) return;
 
+  const { data: sessionRes } = await supabase.auth.getSession();
+  const uid = sessionRes?.session?.user?.id || null;
+
   const records = rows.map((r) => ({
     topic_id: topicId,
     content: r.content,
     options: r.options,
     correct_index: r.correctIndex,
+    created_by: uid,
   }));
 
   const { error } = await supabase.from('quiz_questions').insert(records);
@@ -186,12 +190,16 @@ export async function listTopics(): Promise<QuizTopicItem[]> {
  * Tạo mới chủ đề
  */
 export async function createTopic(grade: number, name: string): Promise<string> {
+  const { data: sessionRes } = await supabase.auth.getSession();
+  const uid = sessionRes?.session?.user?.id || null;
+
   const { data, error } = await supabase
     .from('quiz_topics')
     .insert({
       grade,
       name: name.trim(),
       is_active: false,
+      created_by: uid,
     })
     .select('id')
     .single();
